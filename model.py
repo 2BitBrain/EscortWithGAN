@@ -23,10 +23,17 @@ class model():
         dis_neg = self.discriminator(self.neg_inps, "dis_neg")
         dis_fake_neg = self.discriminator(converted_neg, "dis_neg", reuse=True)
 
-        loss_d_p = tf.nn.softmax_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))
-        loss_d_n = tf.nn.softmax_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))
+        self. loss_d_p = tf.nn.softmax_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))
+        self.loss_d_n = tf.nn.softmax_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))
 
-        
+        self.loss_g_p = tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))
+        self.loss_g_n = tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))
+
+        var_ = tf.global_variables()
+        var_d_p = [var for var in var_ if var.name == "dis_pos"]
+        var_d_n = [var for var in var_ if var.name == "dis_neg"]
+        var_g_p = [var for var in var_ if var.name == "converter_neg2pos"]
+        var_g_n = [var for var in var_ if var.name == "converter_pos2neg"]
 
     def def_cell(self):
         if self.args.cell_model == 'rnn':
@@ -123,3 +130,42 @@ class model():
                 logits = tf.layers.dense(flatten_, 2, name="dense_layer")
            
             return logits
+
+    def train(self):
+        opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p)
+        opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n)
+        opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p)
+        opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n)
+
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.log_device_placement = True
+        with tf.Session(config=config) as sess:
+            tf.global_variables_initializer().run()
+            saver = tf.train.Saver(tf.global_variables())
+            graph = tf.summary.FileWriter('./logs', sess.graph)
+
+            for itr in range(self.args.itrs):
+
+                if itr % 20 != 0:
+                    pass
+
+                if itr % 1000 != 0:
+                    saver.save(sess, "saved/model.ckpt")
+                    print("----------------------saved model-------------------")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument("--lr", dest="lr", type=float, default= 0.2)
+    parser.add_argument("--data_dir", dest="data_dir", default="../data/")
+    parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
+    parser.add_argument("--itrs", dest="itrs", type=int, default=10001)
+    parser.add_argument("--batch_size", dest="batch_size", type=int, default=40)
+    parser.add_argument("--embedding_size", dest="embedding_size", default=64)
+    parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
+    parser.add_argument("--vocab_size", dest="vocab_size", type=int, default=2348)
+    parser.add_argument("--train", dest="train", type=bool, default=True)
+    parser.add_argument("--saved", dest="saved", type=str, default="save/")
+    parser.add_argument("--test", dest="test", type=bool, default=True)
+    args= parser.parse_args()
+
