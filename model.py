@@ -6,6 +6,7 @@ import tensorflow as tf
 import numpy as np
 import tensorflow.contrib.seq2seq as seq2seq
 from util import *
+import os
 
 class model():
     def __init__(self, args):
@@ -115,11 +116,9 @@ class model():
                     t_embedded.append(embedded)
                 cnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(t_embedded), perm=(1,0,2,3)), (-1, self.args.max_time_step, self.args.embedding_size,1))
            
-            kernels = [2,3,4,5,6]
-            filter_nums = [32,64,128,128,224]
             with tf.variable_scope("CNN") as scope:
                 convded = []
-                for kernel, filter_num in zip(kernels, filter_nums):
+                for kernel, filter_num in zip(self.args.kernels, self.args.filter_nums):
                     conv_ = tf.layers.conv2d(cnn_inputs, filter_num, kernel_size=[kernel, self.args.embedding_size], strides=[1, 1], activation=tf.nn.relu, padding='valid', name="conv_{}".format(kernel))
                     pool_ = tf.layers.max_pooling2d(conv_, pool_size=[self.args.max_time_step-kernel+1, 1], padding='valid', strides=[1, 1])
                     convded.append(tf.reshape(pool_, (-1, filter_num)))
@@ -127,7 +126,7 @@ class model():
         
             with tf.variable_scope("Dense") as scope:
                 flatten_ = tf.contrib.layers.flatten(convded)
-                logits = tf.layers.dense(flatten_, 2, name="dense_layer")
+                logits = tf.layers.dense(flatten_, 1, name="dense_layer")
            
             return logits
 
@@ -165,7 +164,18 @@ if __name__ == "__main__":
     parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
     parser.add_argument("--vocab_size", dest="vocab_size", type=int, default=2348)
     parser.add_argument("--train", dest="train", type=bool, default=True)
-    parser.add_argument("--saved", dest="saved", type=str, default="save/")
+    parser.add_argument("--kernels", dest="kernels" type=list, default=[2,3,4,5,6])
+    parser.add_argument("--filter_nums", dest="filter_nums", type=list, default=[32,64,128,128,224])
     parser.add_argument("--test", dest="test", type=bool, default=True)
     args= parser.parse_args()
+    
+    if not os.path.exists("save"):
+        os.mkdir("save")
+
+    if not os.path.exists("logs"):
+        os.mkdir("logs")
+
+    model_ = model(args)
+    if args.train:
+        model_.train()
 
