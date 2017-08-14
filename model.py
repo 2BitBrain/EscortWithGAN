@@ -1,7 +1,7 @@
 import sys
 sys.path.append('../sentiment_analysis/')
 
-
+import argparse
 import tensorflow as tf
 import numpy as np
 import tensorflow.contrib.seq2seq as seq2seq
@@ -12,10 +12,21 @@ class model():
         self.args = args 
          
         self.pos_inps = tf.placeholder(dtype=tf.int32, shape=[None, args.max_time_step, 1])
-        self.pos_labels = tf.placeholder(dtype=tf.float32, shape=[None, 2])
-        
         self.neg_inps = tf.placeholder(dtype=tf.int32, shape=[None, args.max_time_step, 1])
-        self.neg_labels = tf.placeholder(dtype=tf.float32, shape=[None, 2])
+
+        converted_neg = self.converter(self.pos_inps, "converter_pos2neg")
+        converted_pos = self.converter(self.neg_inps, "converter_neg2pos")
+
+        dis_pos = self.discriminator(self.pos_inps, "dis_pos")
+        dis_fake_pos = self.discriminator(converted_pos, "dis_pos", reuse=True)
+
+        dis_neg = self.discriminator(self.neg_inps, "dis_neg")
+        dis_fake_neg = self.discriminator(converted_neg, "dis_neg", reuse=True)
+
+        loss_d_p = tf.nn.softmax_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))
+        loss_d_n = tf.nn.softmax_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))
+
+        
 
     def def_cell(self):
         if self.args.cell_model == 'rnn':
