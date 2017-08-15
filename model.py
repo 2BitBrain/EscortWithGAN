@@ -35,11 +35,17 @@ class model():
         self.loss_g_p = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + tf.reduce_mean(args.l1_lambda*cycle_loss)
         self.loss_g_n = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + tf.reduce_mean(args.l1_lambda*cycle_loss)
 
-        var_ = tf.global_variables()
-        var_d_p = [var for var in var_ if var.name == "dis_pos"]
-        var_d_n = [var for var in var_ if var.name == "dis_neg"]
-        var_g_p = [var for var in var_ if var.name == "converter_neg2pos"]
-        var_g_n = [var for var in var_ if var.name == "converter_pos2neg"]
+        with tf.variable_scope("summary") as scope:
+            tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)
+            tf.summary.scalar("discriminator_neg_loss", self.loss_d_n)
+            tf.summary.scalar("generator_pos_loss", self.loss_g_p)
+            tf.summary.scalar("generator_neg_loss", self.loss_g_n)
+
+        var_ = tf.trainable_variables()
+        self.var_d_p = [var for var in var_ if var.name == "dis_pos"]
+        self.var_d_n = [var for var in var_ if var.name == "dis_neg"]
+        self.var_g_p = [var for var in var_ if var.name == "converter_neg2pos"]
+        self.var_g_n = [var for var in var_ if var.name == "converter_pos2neg"]
 
     def def_cell(self):
         if self.args.cell_model == 'rnn':
@@ -134,10 +140,10 @@ class model():
             return logits
 
     def train(self):
-        opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p)
-        opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n)
-        opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p)
-        opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n)
+        opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p, var_list=self.var_d_p)
+        opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n, var_list=self.var_d_n)
+        opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p, var_list=self.var_g_p)
+        opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n, var_list=self.var_g_n)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
