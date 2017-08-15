@@ -152,6 +152,7 @@ class model():
             tf.global_variables_initializer().run()
             saver = tf.train.Saver(tf.global_variables())
             graph = tf.summary.FileWriter('./logs', sess.graph)
+            merged_summary = tf.summary.merge_all()
 
             for itr in range(self.args.itrs):
 
