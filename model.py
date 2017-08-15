@@ -27,13 +27,13 @@ class model():
         dis_neg = self.discriminator(self.neg_inps, "dis_neg")
         dis_fake_neg = self.discriminator(converted_neg, "dis_neg", reuse=True)
 
-        self.loss_d_p = -1*(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))
-        self.loss_d_n = -1*(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))
+        self.loss_d_p = -1*(tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))
+        self.loss_d_n = -1*(tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))
         
         cycle_loss = tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_neg_pos, self.pos_inps)))) + tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_pos_neg, self.neg_inps)))) 
 
-        self.loss_g_p = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + tf.reduce_mean(args.l1_lambda*cycle_loss)
-        self.loss_g_n = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + tf.reduce_mean(args.l1_lambda*cycle_loss)
+        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + args.l1_lambda*cycle_loss
+        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + args.l1_lambda*cycle_loss
 
         with tf.variable_scope("summary") as scope:
             tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)
@@ -42,10 +42,10 @@ class model():
             tf.summary.scalar("generator_neg_loss", self.loss_g_n)
 
         var_ = tf.trainable_variables()
-        self.var_d_p = [var for var in var_ if var.name == "dis_pos"]
-        self.var_d_n = [var for var in var_ if var.name == "dis_neg"]
-        self.var_g_p = [var for var in var_ if var.name == "converter_neg2pos"]
-        self.var_g_n = [var for var in var_ if var.name == "converter_pos2neg"]
+        self.var_d_p = [var for var in var_ if  "dis_pos" in var.name]
+        self.var_d_n = [var for var in var_ if  "dis_neg" in var.name]
+        self.var_g_p = [var for var in var_ if  "converter_neg2pos" in var.name]
+        self.var_g_n = [var for var in var_ if  "converter_pos2neg" in var.name]
 
     def def_cell(self):
         if self.args.cell_model == 'rnn':
