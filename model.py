@@ -17,6 +17,9 @@ class model():
 
         converted_neg = self.converter(self.pos_inps, "converter_pos2neg")
         converted_pos = self.converter(self.neg_inps, "converter_neg2pos")
+        
+        converted_neg_pos = self.converter(converted_neg, "converter_neg2pos", reuse=True)
+        converted_pos_neg = self.converter(converted_pos, "converter_pos2neg", reuse=True)
 
         dis_pos = self.discriminator(self.pos_inps, "dis_pos")
         dis_fake_pos = self.discriminator(converted_pos, "dis_pos", reuse=True)
@@ -24,11 +27,13 @@ class model():
         dis_neg = self.discriminator(self.neg_inps, "dis_neg")
         dis_fake_neg = self.discriminator(converted_neg, "dis_neg", reuse=True)
 
-        self. loss_d_p = tf.nn.softmax_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))
-        self.loss_d_n = tf.nn.softmax_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg)) + tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))
+        self.loss_d_p = -1*(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))
+        self.loss_d_n = -1*(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))
+        
+        cycle_loss = tf.reduce_mean(tf.abs(tf.subtract(converted_neg_pos, self.pos_inps))) + tf.reduce_mean(tf.abs(tf.subtract(converted_pos_neg, self.neg_inps))) 
 
-        self.loss_g_p = tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))
-        self.loss_g_n = tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))
+        self.loss_g_p = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + tf.reduce_mean(tf.to_float(args.l1_lambda)*cycle_loss)
+        self.loss_g_n = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + tf.reduce_mean(tf.to_float(args.l1_lambda)*cycle_loss)
 
         var_ = tf.global_variables()
         var_d_p = [var for var in var_ if var.name == "dis_pos"]
@@ -46,14 +51,28 @@ class model():
         else:
             raise Exception("model type not supported: {}".format(self.args.cell_model))
 
-        def cell():
-            cell_ = cell_fn(self.args.rnn_size, reuse=tf.get_variable_scope().reuse)
-            if self.args.keep_prob < 1.:
-                cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=self.args.keep_prob)
-            return cell_
         
-        cell = tf.contrib.rnn.MultiRNNCell([cell() for _ in range(self.args.num_layers)], state_is_tuple = True)
-        return cell
+        cell_ = cell_fn(self.args.rnn_size, reuse=tf.get_variable_scope().reuse)
+        if self.args.keep_prob < 1.:
+            cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=self.args.keep_prob)
+        return cell_
+
+    def decoder(self, cell,  state):
+        current_step= 0
+        outputs = []
+        embedding_weight = tf.Variable(tf.random_uniform([self.args.vocab_size, self.args.embedding_size],-1.,1.), name='embedding_weight')
+        while current_step < self.args.max_time_step:
+            if current_step != 0: 
+                tf.get_variable_scope().reuse_variables()
+                embedded = tf.reshape(tf.nn.embedding_lookup(embedding_weight, outputs[-1]), (-1, self.args.embedding_size))
+            else:
+                idx = tf.reshape(tf.convert_to_tensor([self.args.vocab_size-1]*self.args.batch_size), (-1, 1)) 
+                embedded = tf.reshape(tf.nn.embedding_lookup(embedding_weight, idx), (-1, self.args.embedding_size))
+        
+            output, new_state = cell(embedded, state)
+            outputs.append(tf.to_int32(tf.argmax(tf.layers.dense(output, self.args.vocab_size, tf.nn.softmax, name= "decoder_dense"), axis=-1)))
+            current_step += 1
+        return tf.transpose(tf.expand_dims(tf.convert_to_tensor(outputs), axis=-1),(1,0,2))
             
     def converter(self, x, name, reuse=False):
         ##using word level cnn's feature
@@ -66,37 +85,22 @@ class model():
             with tf.variable_scope('Embedding') as scope:
                 rnn_inputs = []
                 embedding_weight = tf.Variable(tf.random_uniform([self.args.vocab_size, self.args.embedding_size],-1.,1.), name='embedding_weight')
-                word_t  = tf.split(self.inputs, self.args.max_time_step, axis=1)
                 
                 for t in range(self.args.max_time_step):
-                    char_index = tf.reshape(word_t[t], shape=[-1, self.args.max_word_length])
-                    embedded = tf.nn.embedding_lookup(embedding_weight, char_index)
+                    embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
                     rnn_inputs.append(embedded)
-                rnn_inputs = tf.convert_to_tensor(rnn_inputs)
-
+                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (0,1,3,2)), (-1, self.args.max_time_step, self.args.embedding_size))
+                print(rnn_inputs.get_shape().as_list())
             with tf.variable_scope('Encoder') as scope:
-                encoder_cell = tf.contrib.rnn.MultiRNNCell(self.def_cell(), state_is_tuple = True)     
-                _, encoder_final_state = tf.nn.dynamic_rnn(encoder_cell, self.encoder_input, initial_state=encoder_cell.zero_state(batch_size=self.args.batch_size, dtype=tf.float32), dtype=tf.float32)
+                encoder_cell = self.def_cell()     
+                _, encoder_final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=self.args.batch_size, dtype=tf.float32), dtype=tf.float32)
 
             with tf.variable_scope("Decoder") as scope:
-                decoder_cell = tf.contrib.rnn.MultiRNNCell(self.def_cell(), state_is_tuple = True)
-                helper = seq2seq.TrainingHelper(self.decoder_input, tf.cast([self.args.max_time_step]*self.args.batch_size, tf.int32))
-                decoder = seq2seq.BasicDecoder(decoder_cell, helper=helper, initial_state=encoder_final_state)
-                decoder_outputs_, decoder_final_state, _ =  seq2seq.dynamic_decode(decoder= decoder)
-                decoder_outputs, sample_id = decoder_outputs_
+                decoder_cell = self.def_cell()
+                outputs = self.decoder(decoder_cell, encoder_final_state)
+                print(outputs.get_shape().as_list())
 
-            with tf.variable_scope("Outputs") as scope:
-                logits = []
-                for t in self.args.max_time_step:
-                    if t != 0:
-                        tf.get_variable_scope().reuse_variables()
-
-                    logit = tf.layers.dense(decoder_outputs[t], self.args.vocab_size, name="dense")
-            
-                    logits.append(logit)
-                logits = tf.convert_to_tensor(logits)
-            
-            return tf.reduce_max(logits, axis=-1)
+            return outputs
 
     def discriminator(self, x, name, reuse=False): 
         with tf.variable_scope(name) as scope:
@@ -112,7 +116,7 @@ class model():
                     if t is not 0:
                         tf.get_variable_scope().reuse_variables()
 
-                    embedded = tf.nn.embedding_lookup(embedding_weight, self.inputs[:,t,:])
+                    embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
                     t_embedded.append(embedded)
                 cnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(t_embedded), perm=(1,0,2,3)), (-1, self.args.max_time_step, self.args.embedding_size,1))
            
@@ -157,14 +161,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--lr", dest="lr", type=float, default= 0.2)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
+    parser.add_argument("--cell_model", dest="cell_model", type=str, default="gru")
+    parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
+    parser.add_argument("--rnn_size", dest="rnn_size", type=int, default=1024)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
     parser.add_argument("--itrs", dest="itrs", type=int, default=10001)
-    parser.add_argument("--batch_size", dest="batch_size", type=int, default=40)
+    parser.add_argument("--batch_size", dest="batch_size", type=int, default=10)
+    parser.add_argument("--num_layers", dest="num_layers", type=int, default=1)
     parser.add_argument("--embedding_size", dest="embedding_size", default=64)
     parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
     parser.add_argument("--vocab_size", dest="vocab_size", type=int, default=2348)
     parser.add_argument("--train", dest="train", type=bool, default=True)
-    parser.add_argument("--kernels", dest="kernels" type=list, default=[2,3,4,5,6])
+    parser.add_argument("--kernels", dest="kernels", type=list, default=[2,3,4,5,6])
+    parser.add_argument("--keep_prob", dest="keep_prob", type=float, default=0.4)
     parser.add_argument("--filter_nums", dest="filter_nums", type=list, default=[32,64,128,128,224])
     parser.add_argument("--test", dest="test", type=bool, default=True)
     args= parser.parse_args()
