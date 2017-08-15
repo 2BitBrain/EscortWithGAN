@@ -30,10 +30,10 @@ class model():
         self.loss_d_p = -1*(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))
         self.loss_d_n = -1*(tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))
         
-        cycle_loss = tf.reduce_mean(tf.abs(tf.subtract(converted_neg_pos, self.pos_inps))) + tf.reduce_mean(tf.abs(tf.subtract(converted_pos_neg, self.neg_inps))) 
+        cycle_loss = tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_neg_pos, self.pos_inps)))) + tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_pos_neg, self.neg_inps)))) 
 
-        self.loss_g_p = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + tf.reduce_mean(tf.to_float(args.l1_lambda)*cycle_loss)
-        self.loss_g_n = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + tf.reduce_mean(tf.to_float(args.l1_lambda)*cycle_loss)
+        self.loss_g_p = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + tf.reduce_mean(args.l1_lambda*cycle_loss)
+        self.loss_g_n = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + tf.reduce_mean(args.l1_lambda*cycle_loss)
 
         var_ = tf.global_variables()
         var_d_p = [var for var in var_ if var.name == "dis_pos"]
@@ -98,7 +98,6 @@ class model():
             with tf.variable_scope("Decoder") as scope:
                 decoder_cell = self.def_cell()
                 outputs = self.decoder(decoder_cell, encoder_final_state)
-                print(outputs.get_shape().as_list())
 
             return outputs
 
@@ -154,7 +153,7 @@ class model():
                     pass
 
                 if itr % 1000 != 0:
-                    saver.save(sess, "saved/model.ckpt")
+                    saver.save(sess, "save/model.ckpt")
                     print("----------------------saved model-------------------")
 
 if __name__ == "__main__":
