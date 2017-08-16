@@ -61,8 +61,8 @@ class model():
         config.log_device_placement = True
         with tf.Session(config=config) as sess:
             tf.global_variables_initializer().run()
-            saver = tf.train.Saver(tf.global_variables())
-            saver.restore(sess, "./save/word_level_cnn_model.ckpt")
+            saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.VARIABLES, scope='Word_Level_CNN'))
+            saver.restore(sess, "./word_level_cnn_save/word_level_cnn_model.ckpt")
             
             graph = tf.summary.FileWriter('./logs', sess.graph)
             merged_summary = tf.summary.merge_all()

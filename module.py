@@ -18,6 +18,8 @@ def def_cell(args, rnn_size):
 
 def extract_feature(x, args, reuse=False):
     with tf.variable_scope("Word_Level_CNN") as scope:
+        if reuse:
+            scope.reuse_variables()
         with tf.variable_scope("Embedding") as scope:
             splitted_word_ids  = tf.split(x, args.max_time_step, axis=1)
             embedding_weight = tf.Variable(tf.random_uniform([args.vocab_size, args.embedding_size],-1.,1.), name='embedding_weight')
@@ -35,7 +37,7 @@ def extract_feature(x, args, reuse=False):
         filter_nums = [32,64,128,128,224]
         with tf.variable_scope("CNN") as scope:
             convded = []
-            for i,(kernel, filter_num) in enumerate(zip(kernels, filter_nums)):
+            for kernel, filter_num in zip(kernels, filter_nums):
                 conv_ = tf.layers.conv2d(cnn_inputs, filter_num, kernel_size=[kernel, args.embedding_size], strides=[1, 1], activation=tf.nn.relu, padding='valid', name="conv_{}".format(kernel), reuse=reuse)
                 pool_ = tf.layers.max_pooling2d(conv_, pool_size=[args.max_time_step-kernel+1, 1], padding='valid', strides=[1, 1])
                 convded.append(tf.reshape(pool_, (-1, filter_num)))
@@ -51,7 +53,7 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
         if reuse:
             tf.get_variable_scope().reuse_variables()
 
-        with tf.variable_scope('Embedding') as scope:
+        with tf.variable_scope(name+'Embedding') as scope:
             rnn_inputs = []
             embedding_weight = tf.Variable(tf.random_uniform([args.vocab_size, args.embedding_size],-1.,1.), name='embedding_weight')
                 
@@ -60,11 +62,11 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
                 rnn_inputs.append(embedded)
             rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (0,1,3,2)), (-1, args.max_time_step, args.embedding_size))
             
-        with tf.variable_scope('RNN') as scope:
+        with tf.variable_scope(name+'RNN') as scope:
             cell_ = def_cell(args, args.gen_rnn_size)     
             rnn_outs, _ = tf.nn.dynamic_rnn(cell_, rnn_inputs, initial_state=extracted_feature, dtype=tf.float32)
 
-        with tf.variable_scope("Dense") as scope:
+        with tf.variable_scope(name+"Dense") as scope:
             logits = []
             outputs = []
             indexs = []
@@ -86,11 +88,11 @@ def discriminator(x, args, name, reuse=False):
         if reuse:
             tf.get_variable_scope().reuse_variables()
 
-        with tf.variable_scope("RNN") as scope:
+        with tf.variable_scope(name+"RNN") as scope:
             cell_ = def_cell(args, args.dis_rnn_size)
             rnn_outputs, _ = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32) 
 
-        with tf.variable_scope("Dense") as scope:
+        with tf.variable_scope(name+"Dense") as scope:
             if args.merged_all:
                 outputs = []
                 for t in range(args.max_time_step):
