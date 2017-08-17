@@ -110,6 +110,7 @@ if __name__ == "__main__":
     parser.add_argument("--itrs", dest="itrs", type=int, default=100001)
     parser.add_argument("--batch_size", dest="batch_size", type=int, default=40)
     parser.add_argument("--embedding_size", dest="embedding_size", default=64)
+    parser.add_argument("--rnn_embedding_size", dest="rnn_embedding_size", type=int, default=64)
     parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
     parser.add_argument("--vocab_size", dest="vocab_size", type=int, default=2348)
     parser.add_argument("--train", dest="train", type=bool, default=True)

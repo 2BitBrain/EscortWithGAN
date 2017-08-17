@@ -59,7 +59,7 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
 
         with tf.variable_scope(name+'Embedding') as scope:
             rnn_inputs = []
-            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], name='embedding_weight')
+            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.rnn_embedding_size], name='embedding_weight')
                 
             for t in range(args.max_time_step):
                 embedded = tf.nn.embedding_lookup(embedding_weight, x_idx[:,t,:])
