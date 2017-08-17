@@ -31,13 +31,15 @@ class model():
         dis_neg = discriminator(self.neg_inps, args, "dis_neg")
         dis_fake_neg = discriminator(self.neg_outs, args, "dis_neg", reuse=True)
 
-        self.loss_d_p = -1*(tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))
-        self.loss_d_n = -1*(tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))
+        self.loss_d_p = (tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))/2
+        self.loss_d_n = (tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))/2
         
-        #cycle_loss = tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_neg_pos, self.pos_inps)))) + tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_pos_neg, self.neg_inps)))) 
+        self.d_loss = self.loss_d_n + self.loss_d_p
 
-        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos)))# + args.l1_lambda*cycle_loss
-        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg)))# + args.l1_lambda*cycle_loss
+        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + args.l1_lambda*tf.reduce_mean(tf.abs(self.pos_inps - converted_neg_pos))
+        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + args.l1_lambda*tf.reduce_mean(tf.abs(self.neg_inps - converted_pos_neg))
+
+        self.g_loss = self.loss_g_n + self.loss_g_p
 
         with tf.variable_scope("summary") as scope:
             tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)
@@ -50,13 +52,17 @@ class model():
         self.var_d_n = [var for var in var_ if  "dis_neg" in var.name]
         self.var_g_p = [var for var in var_ if  "converter_neg2pos" in var.name]
         self.var_g_n = [var for var in var_ if  "converter_pos2neg" in var.name]
-
+        self.var_d = [var for var in var_ if "dis" in var.name]
+        self.var_g = [var for var in var_ if "converter" in var.name]
+        
     def train(self):
         opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p, var_list=self.var_d_p)
         opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n, var_list=self.var_d_n)
         opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p, var_list=self.var_g_p)
         opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n, var_list=self.var_g_n)
-        
+        opt_g = tf.train.AdamOptimizer(self.args.lr, beta1=0.5).minimize(self.g_loss, var_list=self.var_g)
+        opt_d = tf.train.AdamOptimizer(self.args.lr, beta1=0.5).minimize(self.d_loss, var_list=self.var_d)
+
         neg_converted_sentences, neg_one_hot_sentences, pos_converted_sentences, pos_one_hot_sentences = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step)
         neg_data_size = neg_converted_sentences.shape[0]
         pos_data_size = pos_converted_sentences.shape[0]
@@ -79,13 +85,16 @@ class model():
                 neg_choiced_idx = random.sample(range(neg_data_size), self.args.batch_size)
 
                 feed_dict = {self.pos_inps:pos_one_hot_sentences[pos_choiced_idx],self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps:neg_one_hot_sentences[neg_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx]}
-                _, loss_g_n = sess.run([opt_g_n, self.loss_g_n], feed_dict=feed_dict)
-                _, loss_d_n = sess.run([opt_d_n, self.loss_d_n], feed_dict=feed_dict)
-                _, loss_g_p = sess.run([opt_g_p, self.loss_g_p], feed_dict=feed_dict)
-                _, loss_d_p = sess.run([opt_d_p, self.loss_d_p], feed_dict=feed_dict)
+                #_, loss_g_n = sess.run([opt_g_n, self.loss_g_n], feed_dict=feed_dict)
+                #_, loss_d_n = sess.run([opt_d_n, self.loss_d_n], feed_dict=feed_dict)
+                #_, loss_g_p = sess.run([opt_g_p, self.loss_g_p], feed_dict=feed_dict)
+                #_, loss_d_p = sess.run([opt_d_p, self.loss_d_p], feed_dict=feed_dict)
+                _, loss_g = sess.run([opt_g, self.g_loss], feed_dict=feed_dict)
+                _, loss_d = sess.run([opt_d, self.d_loss], feed_dict=feed_dict)
 
                 if itr % 100 == 0:
-                    print("loss_g_n:",loss_g_n,"loss_g_p",loss_g_p,"loss_d_n",loss_d_n,"loss_d_p",loss_d_p)
+                    #print("itr:",itr,"loss_g_n:",loss_g_n,"loss_g_p",loss_g_p,"loss_d_n",loss_d_n,"loss_d_p",loss_d_p)
+                    print("itr", itr, "loss_g", loss_g, "loss_d", loss_d)
 
                 if itr % 10000 == 0:
                     saver_.save(sess, "save/model.ckpt")
@@ -99,7 +108,7 @@ if __name__ == "__main__":
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
     parser.add_argument("--itrs", dest="itrs", type=int, default=100001)
-    parser.add_argument("--batch_size", dest="batch_size", type=int, default=10)
+    parser.add_argument("--batch_size", dest="batch_size", type=int, default=40)
     parser.add_argument("--embedding_size", dest="embedding_size", default=64)
     parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
     parser.add_argument("--vocab_size", dest="vocab_size", type=int, default=2348)
