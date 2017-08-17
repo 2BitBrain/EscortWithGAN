@@ -42,20 +42,31 @@ def remove_anti_pattern(sentence, patterns=[["\.+", " ."], ["\!+", " !"], ["\?+"
 def read_training_data(data_path):
     with open(data_path, "r") as fs:
         lines = fs.readlines()
-    
-    label = [line.split("	")[0] for line in lines]
+   
+    pos = []
+    neg = []
+
+    label = [int(line.split("	")[0]) for line in lines]
     sentences = [remove_anti_pattern(line.split("	")[1].lower()) for line in lines]
-    return label, sentences
+    for label_, sentence in zip(label, sentences):
+        if label_ == 0:
+            neg.append(sentence)
+        else:
+            pos.append(sentence)
+
+    return neg, pos 
 
 def convert_sentence2index(sentences, index, time_step):
     r = []
     for sentence in sentences:
+        #print(sentence)
         words = sentence.split(" ")
         converted = [index.index(word) for word in words]
         while len(converted) != time_step and len(converted) <= time_step:
             converted.append(len(index))
         r.append(converted[:time_step])
-    return r
+    return np.reshape(np.array(r), (-1, time_step, 1))
+
 
 def convert_label(labels):
     r = []
@@ -71,60 +82,36 @@ def convert_senteo2one_hot_encoding(sentences, indexs, time_step):
         words = sentence.split(" ")
         time_steps = []
         for word in words:
-            content = [0]*(len(indexs)+1)
+            content = [0]*(len(indexs)+2)
             idx = indexs.index(word)
             content[idx] = 1
             time_steps.append(content)
 
         while len(time_steps) <= time_step and len(time_steps) != time_step:
-            content = [0]*(len(indexs)+1)
+            content = [0]*(len(indexs)+2)
             content[len(indexs)] = 1
             time_steps.insert(0, content)
 
         r.append(time_steps[:time_step])
-    return r
-
-def convert_sentence2word_idx(sentences, indexs, time_step, word_length):
-    r = []
-    for sentence in sentences:
-        words = sentence.split(" ")
-        t = []
-        for word in words[:-1]:
-            converted = [indexs.index(char) for char in word]
-            while len(converted) != word_length and len(converted) <= word_length:
-                converted.append(len(indexs))
-            t.append(converted[:word_length])
-            
-        while len(t) != time_step and len(t) <= time_step:
-            t.insert(0, [len(indexs)+1]*word_length)
-        
-        r.append(t[:time_step])
-    return r    
+    return np.array(r)
 
 def mk_train_data(data_path, index_path, time_step):
-    labels, sentences = read_training_data(data_path)
+    neg_sentences, pos_sentences = read_training_data(data_path)
+    print(len(neg_sentences), len(pos_sentences))
     if  not os.path.exists(index_path):
         word = []
         for r_text in sentences:
-            print(r_text)
+            #print(r_text)
             [word.append(word_) for word_ in r_text.split(' ')]
         save_index(set(word), index_path)
     
     indexs = read_index(index_path)
-    labels = convert_label(labels)
-    converted_sentences = convert_sentence2index(sentences, indexs, time_step)
-    return np.array(labels), np.reshape(np.array(converted_sentences), (-1, time_step, 1))
-
-def mk_train_onehot_data(data_path, index_path, time_step):
-    labels, sentences = read_training_data(data_path)
-    if not os.path.exists(index_path):
-        word = []
-        for r_text in sentences:
-            print(r_text)
-            [word.append(word_) for word_ in r_text.aplit(' ')]
-        save_index(set(word), index_path)
-
-    indexs = read_index(index_path)
-    labels = convert_label(labels)
-    converted_sentences = convert_senteo2one_hot_encoding(sentences, indexs, time_step)
-    return np.array(labels), np.array(converted_sentences)
+    neg_converted_sentences = convert_sentence2index(neg_sentences, indexs, time_step)
+    print("Done converting negative sentences")
+    neg_one_hot_sentences = convert_senteo2one_hot_encoding(neg_sentences, indexs, time_step)
+    print("Done converting negative sentences to one hot vector")
+    pos_converted_sentences = convert_sentence2index(pos_sentences, indexs, time_step)
+    print("Done converting postive sentences")
+    pos_one_hot_sentences = convert_senteo2one_hot_encoding(pos_sentences, indexs, time_step)
+    print("Done converting positive sentences to one hot vector")
+    return neg_converted_sentences, neg_one_hot_sentences, pos_converted_sentences, pos_one_hot_sentences
