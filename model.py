@@ -33,10 +33,10 @@ class model():
         self.loss_d_p = -1*(tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))
         self.loss_d_n = -1*(tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))
         
-        cycle_loss = tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_neg_pos, self.pos_inps)))) + tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_pos_neg, self.neg_inps)))) 
+        #cycle_loss = tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_neg_pos, self.pos_inps)))) + tf.to_float(tf.reduce_mean(tf.abs(tf.subtract(converted_pos_neg, self.neg_inps)))) 
 
-        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + args.l1_lambda*cycle_loss
-        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + args.l1_lambda*cycle_loss
+        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos)))# + args.l1_lambda*cycle_loss
+        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg)))# + args.l1_lambda*cycle_loss
 
         with tf.variable_scope("summary") as scope:
             tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)

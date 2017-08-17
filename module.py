@@ -17,12 +17,16 @@ def def_cell(args, rnn_size):
         return cell_
 
 def extract_feature(x, args, reuse=False):
-    with tf.variable_scope("Word_Level_CNN") as scope:
+    with tf.variable_scope("Word_Level_CNN", reuse=reuse) as scope:
         if reuse:
             scope.reuse_variables()
-        with tf.variable_scope("Embedding") as scope:
+            print(scope.name)
+        else:
+            assert tf.get_variable_scope().reuse == False
+
+        with tf.variable_scope("Embedding", reuse=reuse):
             splitted_word_ids  = tf.split(x, args.max_time_step, axis=1)
-            embedding_weight = tf.Variable(tf.random_uniform([args.vocab_size, args.embedding_size],-1.,1.), name='embedding_weight')
+            embedding_weight = tf.get_variable(name='embedding_weight', shape=[args.vocab_size, args.embedding_size])
             t_embedded = []
             
             for t in range(args.max_time_step):
@@ -35,7 +39,7 @@ def extract_feature(x, args, reuse=False):
            
         kernels = [2,3,4,5,6]
         filter_nums = [32,64,128,128,224]
-        with tf.variable_scope("CNN") as scope:
+        with tf.variable_scope("CNN", reuse=reuse):
             convded = []
             for kernel, filter_num in zip(kernels, filter_nums):
                 conv_ = tf.layers.conv2d(cnn_inputs, filter_num, kernel_size=[kernel, args.embedding_size], strides=[1, 1], activation=tf.nn.relu, padding='valid', name="conv_{}".format(kernel), reuse=reuse)
