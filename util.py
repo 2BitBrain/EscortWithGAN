@@ -95,6 +95,21 @@ def convert_senteo2one_hot_encoding(sentences, indexs, time_step):
         r.append(time_steps[:time_step])
     return np.array(r)
 
+def visualizer(x, y, index_path, save_path):
+    indexs = read_index(index_path)
+    sentences_x = []
+    sentences_y = []
+    for s_x, s_y in zip(x, y):
+        idxs_x = np.argmax(s_x, axis=-1)
+        idxs_y = np.argmax(s_y, axis=-1)
+        sentences_x.append(" ".join([indexs[idx] for idx in idxs_x if len(indexs) > idx]))
+        sentences_y.append(" ".join([indexs[idx] for idx in idxs_y if len(indexs) > idx]))
+
+
+    with open(save_path, "a") as fs:
+        fs.write("\n".join(["{}  <-> {}".format(x,y) for x,y in zip(sentences_x, sentences_y)]))
+
+
 def mk_train_data(data_path, index_path, time_step):
     neg_sentences, pos_sentences = read_training_data(data_path)
     print(len(neg_sentences), len(pos_sentences))

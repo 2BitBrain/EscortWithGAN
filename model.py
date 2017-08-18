@@ -93,7 +93,10 @@ class model():
                 _, loss_d = sess.run([opt_d, self.d_loss], feed_dict=feed_dict)
 
                 if itr % 100 == 0:
-                    #print("itr:",itr,"loss_g_n:",loss_g_n,"loss_g_p",loss_g_p,"loss_d_n",loss_d_n,"loss_d_p",loss_d_p)
+                    feed_dict = {self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx]} 
+                    neg_s, pos_s = sess.run([self.neg_outs, self.pos_outs], feed_dict)
+                    visualizer(neg_s, pos_one_hot_sentences[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
+                    visualizer(pos_s, neg_one_hot_sentences[neg_choiced_idx],"data/index.txt", "visualize_pos.txt")
                     print("itr", itr, "loss_g", loss_g, "loss_d", loss_d)
 
                 if itr % 10000 == 0:

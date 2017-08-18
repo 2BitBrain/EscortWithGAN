@@ -88,6 +88,11 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
             indexs = tf.transpose(tf.convert_to_tensor(indexs), (1,0,2))
         return logits, outputs, indexs
 
+def converter_(x, args, name, reuse=False):
+    with tf.variable_scope(name) as scope:
+        if reuse:
+            scope.reuse_variables()
+
 def discriminator(x, args, name, reuse=False): 
     with tf.variable_scope(name) as scope:
         if reuse:
