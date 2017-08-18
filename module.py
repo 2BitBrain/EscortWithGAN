@@ -47,6 +47,25 @@ def extract_feature(x, args, reuse=False):
             convded = tf.concat([cnn_output for cnn_output in convded], axis=-1)
     return  tf.contrib.layers.flatten(convded)
 
+def decoder(x, args, cell, state, activation=tf.nn.sigmoid):
+    logits = []
+    probablistic = []
+    indexs = []
+    for t in range(args.max_time_step):
+        if t != 0:
+            tf.get_variable_scope().reuse()
+
+        out, state = cell(x[:,t,:], state)
+        logit = tf.layers.dense(out, args.vocab_size, activation=activation, name="rnn_out_dense")
+        logits.append(logit)
+        probablistic.append(tf.nn.softmax(logit))
+        indexs.append(tf.argmax(tf.nn.softmax(logit), axis=-1))
+    
+    logits = tf.transpose(tf.convert_to_tensor(logits), (1,0,2))
+    probablistic = tf.transpose(tf.convert_to_tensor(probablistic), (1,0,2))
+    indexs = tf.transpose(tf.convert_to_tensor(indexs), (1,0,2))
+    return logits, probablistic, indexs
+                          
 def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
     ##using word level cnn's feature
     ##input shapes are (None, max_timestep, 1)
@@ -59,12 +78,13 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
 
         with tf.variable_scope(name+'Embedding') as scope:
             rnn_inputs = []
-            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.rnn_embedding_size], name='embedding_weight')
+            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.rnn_embedding_size], dtype=tf.float32, name='embedding_weight')
                 
             for t in range(args.max_time_step):
                 embedded = tf.nn.embedding_lookup(embedding_weight, x_idx[:,t,:])
                 rnn_inputs.append(embedded)
-            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (0,1,3,2)), (-1, args.max_time_step, args.embedding_size))
+            #print(tf.convert_to_tensor(rnn_inputs).get_shape().as_list())
+            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)), (-1, args.max_time_step, args.embedding_size))
             
         with tf.variable_scope(name+'RNN') as scope:
             #cell_ = tf.contrib.rnn.MultiRNNCell([def_cell(args, args.gen_rnn_size) for _ in range(1)], state_is_tuple = True)     
@@ -88,10 +108,31 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
             indexs = tf.transpose(tf.convert_to_tensor(indexs), (1,0,2))
         return logits, outputs, indexs
 
-def converter_(x, args, name, reuse=False):
+def converter_(x, go, args, name, reuse=False, extract_reuse=False):
+    extracted_feature = extract_feature(x, args, extract_reuse)
     with tf.variable_scope(name) as scope:
         if reuse:
             scope.reuse_variables()
+        
+        with tf.variable_scope(name+"Embedding") as scope:
+            rnn_inputs = []
+            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], dtype=tf.float32, name= "embedding_weight")
+
+            for t in range(args.max_time_step):
+                embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
+                rnn_inputs.append(embedded)
+            #print(tf.convert_to_tensor(rnn_inputs).get_shape().as_list())
+            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
+
+        with tf.variable_scope(name+"Encoder") as scope:
+            encoder_cell = def_cell(args, args.rnn_size)
+            rnn_outs, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
+        
+        with tf.variable_scope(name+"Decoder") as scope:
+            decoder_cell = def_cell(args, args.rnn_size+extract_feature.get_shape().as_list()[1])
+            state = tf.concat([final_state, extracted_feature], axis=-1)
+            logits, probablisitc, indexs = decoder(go , args, decoder_cell, state)
+    return logits , probablistic, indexs
 
 def discriminator(x, args, name, reuse=False): 
     with tf.variable_scope(name) as scope:
