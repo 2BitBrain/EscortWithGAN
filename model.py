@@ -18,12 +18,22 @@ class model():
         self.pos_inps_indexs = tf.placeholder(dtype=tf.int32, shape=[None, args.max_time_step, 1])
         self.neg_inps = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size])
         self.neg_inps_indexs = tf.placeholder(dtype=tf.int32, shape=[None, args.max_time_step, 1])
+        self.go = tf.placeholder(dtype=tf.float32, shape=[None, args.vocab_size])
 
-        converted_neg, self.neg_outs, neg_indexs = converter(self.pos_inps, self.pos_inps_indexs, args, "converter_pos2neg")
-        converted_pos, self.pos_outs, pos_indexs = converter(self.neg_inps, self.neg_inps_indexs, args, "converter_neg2pos", extract_reuse=True)
+        #converted_neg, self.neg_outs, neg_indexs = converter(self.pos_inps, self.pos_inps_indexs, args, "converter_pos2neg")
+        #converted_pos, self.pos_outs, pos_indexs = converter(self.neg_inps, self.neg_inps_indexs, args, "converter_neg2pos", extract_reuse=True)
        
-        converted_neg_pos, neg_pos_outs, neg_pos_indexs = converter(converted_neg, neg_indexs, args, "converter_neg2pos", reuse=True, extract_reuse=True)
-        converted_pos_neg, pos_neg_outs, pos_neg_indexs = converter(converted_pos, pos_indexs, args, "converter_pos2neg", reuse=True, extract_reuse=True)
+        #converted_neg_pos, neg_pos_outs, neg_pos_indexs = converter(converted_neg, neg_indexs, args, "converter_neg2pos", reuse=True, extract_reuse=True)
+        #converted_pos_neg, pos_neg_outs, pos_neg_indexs = converter(converted_pos, pos_indexs, args, "converter_pos2neg", reuse=True, extract_reuse=True)
+
+        _, self.neg_outs, neg_indexs = converter_(self.pos_inps_indexs, self.go, args, "converter_pos2neg")
+        _, self.pos_outs, pos_indexs = converter_(self.neg_inps_indexs, self.go, args, "converter_neg2pos", extract_reuse=True)
+        print(neg_indexs.get_shape().as_list())
+        _, neg_pos_outs, neg_pos_indexs = converter_(neg_indexs, self.go, args, "converter_neg2pos", True, True)
+        _, pos_neg_outs, pos_neg_indexs = converter_(pos_indexs, self.go, args, "converter_pos2neg", True, True)
+
+        l_p = tf.reduce_mean(tf.abs(extract_feature(self.pos_inps_indexs, args, True) - extract_feature(neg_pos_indexs, args, True)))
+        l_n = tf.reduce_mean(tf.abs(extract_feature(self.neg_inps_indexs, args, True) - extract_feature(pos_neg_indexs, args, True)))
 
         dis_pos = discriminator(self.pos_inps, args, "dis_pos")
         dis_fake_pos = discriminator(self.pos_outs, args, "dis_pos", reuse=True)    
@@ -36,10 +46,10 @@ class model():
         
         self.d_loss = self.loss_d_n + self.loss_d_p
 
-        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) + args.l1_lambda*tf.reduce_mean(tf.abs(self.pos_inps - converted_neg_pos))
-        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) + args.l1_lambda*tf.reduce_mean(tf.abs(self.neg_inps - converted_pos_neg))
+        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) #+ args.l1_lambda*tf.reduce_mean(tf.abs(self.pos_inps - neg_pos_outs))
+        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) #+ args.l1_lambda*tf.reduce_mean(tf.abs(self.neg_inps - pos_neg_outs))
 
-        self.g_loss = self.loss_g_n + self.loss_g_p
+        self.g_loss = self.loss_g_n + self.loss_g_p + l_n + l_p
 
         with tf.variable_scope("summary") as scope:
             tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)
@@ -66,7 +76,8 @@ class model():
         neg_converted_sentences, neg_one_hot_sentences, pos_converted_sentences, pos_one_hot_sentences = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step)
         neg_data_size = neg_converted_sentences.shape[0]
         pos_data_size = pos_converted_sentences.shape[0]
-        print(neg_data_size, print(pos_data_size))
+        
+        go = mk_go(self.args.batch_size, self.args.vocab_size)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -84,7 +95,7 @@ class model():
                 pos_choiced_idx = random.sample(range(pos_data_size), self.args.batch_size)
                 neg_choiced_idx = random.sample(range(neg_data_size), self.args.batch_size)
 
-                feed_dict = {self.pos_inps:pos_one_hot_sentences[pos_choiced_idx],self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps:neg_one_hot_sentences[neg_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx]}
+                feed_dict = {self.pos_inps:pos_one_hot_sentences[pos_choiced_idx],self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps:neg_one_hot_sentences[neg_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx], self.go:go}
                 #_, loss_g_n = sess.run([opt_g_n, self.loss_g_n], feed_dict=feed_dict)
                 #_, loss_d_n = sess.run([opt_d_n, self.loss_d_n], feed_dict=feed_dict)
                 #_, loss_g_p = sess.run([opt_g_p, self.loss_g_p], feed_dict=feed_dict)
@@ -93,7 +104,7 @@ class model():
                 _, loss_d = sess.run([opt_d, self.d_loss], feed_dict=feed_dict)
 
                 if itr % 100 == 0:
-                    feed_dict = {self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx]} 
+                    feed_dict = {self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx], self.go:go} 
                     neg_s, pos_s = sess.run([self.neg_outs, self.pos_outs], feed_dict)
                     visualizer(neg_s, pos_one_hot_sentences[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
                     visualizer(pos_s, neg_one_hot_sentences[neg_choiced_idx],"data/index.txt", "visualize_pos.txt")
@@ -105,20 +116,20 @@ class model():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--lr", dest="lr", type=float, default= 0.02)
+    parser.add_argument("--lr", dest="lr", type=float, default= 0.003)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
     parser.add_argument("--cell_model", dest="cell_model", type=str, default="gru")
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
-    parser.add_argument("--itrs", dest="itrs", type=int, default=100001)
-    parser.add_argument("--batch_size", dest="batch_size", type=int, default=40)
+    parser.add_argument("--itrs", dest="itrs", type=int, default=1000001)
+    parser.add_argument("--batch_size", dest="batch_size", type=int, default=50)
     parser.add_argument("--embedding_size", dest="embedding_size", default=64)
     parser.add_argument("--rnn_embedding_size", dest="rnn_embedding_size", type=int, default=64)
     parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
     parser.add_argument("--vocab_size", dest="vocab_size", type=int, default=2348)
     parser.add_argument("--train", dest="train", type=bool, default=True)
     parser.add_argument("--keep_prob", dest="keep_prob", type=float, default=1)
-    parser.add_argument("--gen_rnn_size", dest="gen_rnn_size", type=int, default=576)
+    parser.add_argument("--gen_rnn_size", dest="gen_rnn_size", type=int, default=1024)
     parser.add_argument("--dis_rnn_size", dest="dis_rnn_size", type=int, default=576)
     parser.add_argument("--merged_all", dest="merged_all", type=bool, default=True)
     args= parser.parse_args()

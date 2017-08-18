@@ -53,18 +53,18 @@ def decoder(x, args, cell, state, activation=tf.nn.sigmoid):
     indexs = []
     for t in range(args.max_time_step):
         if t != 0:
-            tf.get_variable_scope().reuse()
+            tf.get_variable_scope().reuse_variables()
 
-        out, state = cell(x[:,t,:], state)
+        out, state = cell(x, state)
         logit = tf.layers.dense(out, args.vocab_size, activation=activation, name="rnn_out_dense")
         logits.append(logit)
         probablistic.append(tf.nn.softmax(logit))
         indexs.append(tf.argmax(tf.nn.softmax(logit), axis=-1))
-    
+        x =tf.nn.softmax(logit) 
     logits = tf.transpose(tf.convert_to_tensor(logits), (1,0,2))
-    probablistic = tf.transpose(tf.convert_to_tensor(probablistic), (1,0,2))
-    indexs = tf.transpose(tf.convert_to_tensor(indexs), (1,0,2))
-    return logits, probablistic, indexs
+    prob = tf.transpose(tf.convert_to_tensor(probablistic), (1,0,2))
+    indexs = tf.expand_dims(tf.transpose(tf.convert_to_tensor(indexs), (1,0)), axis=-1)
+    return logits, prob, indexs
                           
 def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
     ##using word level cnn's feature
@@ -125,14 +125,14 @@ def converter_(x, go, args, name, reuse=False, extract_reuse=False):
             rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
 
         with tf.variable_scope(name+"Encoder") as scope:
-            encoder_cell = def_cell(args, args.rnn_size)
+            encoder_cell = def_cell(args, args.gen_rnn_size)
             rnn_outs, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
         with tf.variable_scope(name+"Decoder") as scope:
-            decoder_cell = def_cell(args, args.rnn_size+extract_feature.get_shape().as_list()[1])
-            state = tf.concat([final_state, extracted_feature], axis=-1)
-            logits, probablisitc, indexs = decoder(go , args, decoder_cell, state)
-    return logits , probablistic, indexs
+            decoder_cell = def_cell(args, args.gen_rnn_size+576)
+            state = tf.nn.tanh(tf.concat([final_state, extracted_feature], axis=-1))
+            logits, prob, indexs = decoder(go , args, decoder_cell, state)
+    return  logits, prob, indexs
 
 def discriminator(x, args, name, reuse=False): 
     with tf.variable_scope(name) as scope:

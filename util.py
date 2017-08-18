@@ -56,6 +56,14 @@ def read_training_data(data_path):
 
     return neg, pos 
 
+def mk_go(batch_size, vocab_size):
+    r = []
+    for _ in range(batch_size):
+        c = [0]*vocab_size
+        c[vocab_size-1] = 1
+        r.append(c)
+    return np.array(r)
+
 def convert_sentence2index(sentences, index, time_step):
     r = []
     for sentence in sentences:
