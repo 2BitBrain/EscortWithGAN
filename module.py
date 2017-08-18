@@ -125,12 +125,14 @@ def converter_(x, go, args, name, reuse=False, extract_reuse=False):
             rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
 
         with tf.variable_scope(name+"Encoder") as scope:
-            encoder_cell = def_cell(args, args.gen_rnn_size)
+            encoder_cell = def_cell(args, 576)
             rnn_outs, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
         with tf.variable_scope(name+"Decoder") as scope:
-            decoder_cell = def_cell(args, args.gen_rnn_size+576)
-            state = tf.nn.tanh(tf.concat([final_state, extracted_feature], axis=-1))
+            decoder_cell = def_cell(args, 576)
+            state = final_state + extracted_feature
+            noise = tf.random_normal(shape=tf.shape(state), mean=0.0, stddev=1., dtype=tf.float32)
+            state = tf.nn.tanh(state+noise)
             logits, prob, indexs = decoder(go , args, decoder_cell, state)
     return  logits, prob, indexs
 
@@ -141,7 +143,7 @@ def discriminator(x, args, name, reuse=False):
 
         with tf.variable_scope(name+"RNN") as scope:
             cell_ = def_cell(args, args.dis_rnn_size)
-            rnn_outputs, _ = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32) 
+            rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32) 
 
         with tf.variable_scope(name+"Dense") as scope:
             if args.merged_all:
@@ -155,4 +157,4 @@ def discriminator(x, args, name, reuse=False):
             else:
                 logits = tf.layers.dense(rnn_outputs[-1], 1, activation=tf.nn.sigmoid)
 
-        return logits
+        return logits, final_state

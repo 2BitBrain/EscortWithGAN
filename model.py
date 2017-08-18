@@ -32,14 +32,17 @@ class model():
         _, neg_pos_outs, neg_pos_indexs = converter_(neg_indexs, self.go, args, "converter_neg2pos", True, True)
         _, pos_neg_outs, pos_neg_indexs = converter_(pos_indexs, self.go, args, "converter_pos2neg", True, True)
 
-        l_p = tf.reduce_mean(tf.abs(extract_feature(self.pos_inps_indexs, args, True) - extract_feature(neg_pos_indexs, args, True)))
-        l_n = tf.reduce_mean(tf.abs(extract_feature(self.neg_inps_indexs, args, True) - extract_feature(pos_neg_indexs, args, True)))
-
-        dis_pos = discriminator(self.pos_inps, args, "dis_pos")
-        dis_fake_pos = discriminator(self.pos_outs, args, "dis_pos", reuse=True)    
+        #l_p = tf.reduce_mean(tf.abs(extract_feature(self.pos_inps_indexs, args, True) - extract_feature(neg_pos_indexs, args, True)))
+        #l_n = tf.reduce_mean(tf.abs(extract_feature(self.neg_inps_indexs, args, True) - extract_feature(pos_neg_indexs, args, True)))
+         
+        dis_pos, pos_state= discriminator(self.pos_inps, args, "dis_pos")
+        dis_fake_pos, fake_pos_state = discriminator(self.pos_outs, args, "dis_pos", reuse=True)    
         
-        dis_neg = discriminator(self.neg_inps, args, "dis_neg")
-        dis_fake_neg = discriminator(self.neg_outs, args, "dis_neg", reuse=True)
+        dis_neg, neg_state = discriminator(self.neg_inps, args, "dis_neg")
+        dis_fake_neg, fake_neg_state = discriminator(self.neg_outs, args, "dis_neg", reuse=True)
+        
+        l_p = tf.reduce_mean(tf.abs(pos_state - fake_pos_state))
+        l_n = tf.reduce_mean(tf.abs(neg_state - fake_neg_state))
 
         self.loss_d_p = (tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))/2
         self.loss_d_n = (tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))/2
@@ -70,8 +73,8 @@ class model():
         opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n, var_list=self.var_d_n)
         opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p, var_list=self.var_g_p)
         opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n, var_list=self.var_g_n)
-        opt_g = tf.train.AdamOptimizer(self.args.lr, beta1=0.5).minimize(self.g_loss, var_list=self.var_g)
-        opt_d = tf.train.AdamOptimizer(self.args.lr, beta1=0.5).minimize(self.d_loss, var_list=self.var_d)
+        opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
+        opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
 
         neg_converted_sentences, neg_one_hot_sentences, pos_converted_sentences, pos_one_hot_sentences = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step)
         neg_data_size = neg_converted_sentences.shape[0]
@@ -116,7 +119,7 @@ class model():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--lr", dest="lr", type=float, default= 0.003)
+    parser.add_argument("--lr", dest="lr", type=float, default= 0.002)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
     parser.add_argument("--cell_model", dest="cell_model", type=str, default="gru")
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
