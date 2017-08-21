@@ -52,7 +52,7 @@ class model():
         self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) #+ args.l1_lambda*tf.reduce_mean(tf.abs(self.pos_inps - neg_pos_outs))
         self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) #+ args.l1_lambda*tf.reduce_mean(tf.abs(self.neg_inps - pos_neg_outs))
 
-        self.g_loss = self.loss_g_n + self.loss_g_p + l_n + l_p
+        self.g_loss = self.loss_g_n + self.loss_g_p# + l_n + l_p
 
         with tf.variable_scope("summary") as scope:
             tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)
@@ -69,10 +69,10 @@ class model():
         self.var_g = [var for var in var_ if "converter" in var.name]
         
     def train(self):
-        opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p, var_list=self.var_d_p)
-        opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n, var_list=self.var_d_n)
-        opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p, var_list=self.var_g_p)
-        opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n, var_list=self.var_g_n)
+       # opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p, var_list=self.var_d_p)
+       # opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n, var_list=self.var_d_n)
+       # opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p, var_list=self.var_g_p)
+       # opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n, var_list=self.var_g_n)
         opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
 
@@ -93,6 +93,8 @@ class model():
 
             graph = tf.summary.FileWriter('./logs', sess.graph)
             merged_summary = tf.summary.merge_all()
+            
+            print([var.name for var in tf.trainable_variables()])
 
             for itr in range(self.args.itrs):
                 pos_choiced_idx = random.sample(range(pos_data_size), self.args.batch_size)
@@ -134,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument("--keep_prob", dest="keep_prob", type=float, default=1)
     parser.add_argument("--gen_rnn_size", dest="gen_rnn_size", type=int, default=1024)
     parser.add_argument("--dis_rnn_size", dest="dis_rnn_size", type=int, default=576)
-    parser.add_argument("--merged_all", dest="merged_all", type=bool, default=True)
+    parser.add_argument("--merged_all", dest="merged_all", type=bool, default=False)
     args= parser.parse_args()
     
     if not os.path.exists("save"):

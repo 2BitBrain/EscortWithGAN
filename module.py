@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-def def_cell(args, rnn_size):
+def def_cell(args, rnn_size, reuse=False):
         if args.cell_model == 'rnn':
             cell_fn = tf.contrib.rnn.BasicRNNCell
         elif args.cell_model == 'gru':
@@ -10,9 +10,9 @@ def def_cell(args, rnn_size):
         else:
             raise Exception("model type not supported: {}".format(args.cell_model))
  
-        cell_ = cell_fn(rnn_size, reuse=tf.get_variable_scope().reuse)
-        if args.keep_prob < 1.:
-            cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=args.keep_prob)
+        cell_ = cell_fn(rnn_size, reuse=reuse)
+        #if args.keep_prob < 1.:
+        #    cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=args.keep_prob)
         return cell_
 
 def extract_feature(x, args, reuse=False):
@@ -72,11 +72,9 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
     ##output shape are (None, max_timestep, 1) and return index which is highest probablistic.
     extracted_feature = extract_feature(x_idx, args, extract_reuse)
     #extracted_feature = tf.reshape(tf.convert_to_tensor([extracted_feature for _ in range(4)]),(-1, 4*args.gen_rnn_size))
-    with tf.variable_scope(name) as scope:
-        if reuse:
-            tf.get_variable_scope().reuse_variables()
+    with tf.variable_scope(name, reuse=reuse) as scope:
 
-        with tf.variable_scope(name+'Embedding') as scope:
+        with tf.variable_scope(name+'Embedding', reuse=reuse) as scope:
             rnn_inputs = []
             embedding_weight = tf.get_variable(shape=[args.vocab_size, args.rnn_embedding_size], dtype=tf.float32, name='embedding_weight')
                 
@@ -86,9 +84,9 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
             #print(tf.convert_to_tensor(rnn_inputs).get_shape().as_list())
             rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)), (-1, args.max_time_step, args.embedding_size))
             
-        with tf.variable_scope(name+'RNN') as scope:
+        with tf.variable_scope(name+'RNN', reuse=reuse) as scope:
             #cell_ = tf.contrib.rnn.MultiRNNCell([def_cell(args, args.gen_rnn_size) for _ in range(1)], state_is_tuple = True)     
-            cell_ = def_cell(args, args.gen_rnn_size)
+            cell_ = def_cell(args, args.gen_rnn_size, reuse)
             rnn_outs, _ = tf.nn.dynamic_rnn(cell_, rnn_inputs, initial_state=extracted_feature, dtype=tf.float32)
 
         with tf.variable_scope(name+"Dense") as scope:
@@ -109,14 +107,13 @@ def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
         return logits, outputs, indexs
 
 def converter_(x, go, args, name, reuse=False, extract_reuse=False):
-    extracted_feature = extract_feature(x, args, extract_reuse)
-    with tf.variable_scope(name) as scope:
-        if reuse:
-            scope.reuse_variables()
-        
-        with tf.variable_scope(name+"Embedding") as scope:
+    extracted_feature = extract_feature(x, args, extract_reuse)*0.01
+    with tf.variable_scope(name, reuse=reuse) as scope:
+       
+        print(tf.contrib.framework.get_name_scope())
+        with tf.variable_scope(name+"Embedding", reuse=reuse) as scope:
             rnn_inputs = []
-            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], dtype=tf.float32, name= "embedding_weight")
+            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
 
             for t in range(args.max_time_step):
                 embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
@@ -124,28 +121,39 @@ def converter_(x, go, args, name, reuse=False, extract_reuse=False):
             #print(tf.convert_to_tensor(rnn_inputs).get_shape().as_list())
             rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
 
-        with tf.variable_scope(name+"Encoder") as scope:
-            encoder_cell = def_cell(args, 576)
+        with tf.variable_scope(name+"Encoder", reuse=reuse) as scope:
+            encoder_cell = def_cell(args, args.gen_rnn_size, reuse)
             rnn_outs, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
-        with tf.variable_scope(name+"Decoder") as scope:
-            decoder_cell = def_cell(args, 576)
-            state = final_state + extracted_feature
+        with tf.variable_scope(name+"Decoder", reuse=reuse) as scope:
+            decoder_cell = def_cell(args, args.gen_rnn_size+576, reuse)
+            state = tf.concat([final_state, extracted_feature], axis=-1)
             noise = tf.random_normal(shape=tf.shape(state), mean=0.0, stddev=1., dtype=tf.float32)
             state = tf.nn.tanh(state+noise)
             logits, prob, indexs = decoder(go , args, decoder_cell, state)
     return  logits, prob, indexs
 
 def discriminator(x, args, name, reuse=False): 
-    with tf.variable_scope(name) as scope:
-        if reuse:
-            tf.get_variable_scope().reuse_variables()
+    with tf.variable_scope(name, reuse=reuse) as scope:
 
-        with tf.variable_scope(name+"RNN") as scope:
-            cell_ = def_cell(args, args.dis_rnn_size)
-            rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32) 
+        print(tf.contrib.framework.get_name_scope())
+        with tf.variable_scope(name+"RNN", reuse=reuse) as scope:
+            if args.cell_model == 'rnn':
+                cell_fn = tf.contrib.rnn.BasicRNNCell
+            elif args.cell_model == 'gru':
+                cell_fn = tf.contrib.rnn.GRUCell
+            elif args.cell_model == 'lstm':
+                pass
+            else:
+                raise Exception("model type not supported: {}".format(args.cell_model))
+ 
+            cell_ = cell_fn(args.dis_rnn_size, reuse=reuse)
+            #if args.keep_prob < 1.:
+            #    cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=args.keep_prob)
+        
+            rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), scope=name+"d_rnn",dtype=tf.float32) 
 
-        with tf.variable_scope(name+"Dense") as scope:
+        with tf.variable_scope(name+"Dense", reuse=reuse) as scope:
             if args.merged_all:
                 outputs = []
                 for t in range(args.max_time_step):
@@ -155,6 +163,6 @@ def discriminator(x, args, name, reuse=False):
                     outputs.append(tf.layers.dense(rnn_outputs[:,t,:], 1, activation=tf.nn.sigmoid, name="rnn_out_dense"))
                 logits = tf.reduce_sum(tf.transpose(tf.convert_to_tensor(outputs),(1,0,2)), axis=1)
             else:
-                logits = tf.layers.dense(rnn_outputs[-1], 1, activation=tf.nn.sigmoid)
+                logits = tf.layers.dense(rnn_outputs[-1], 1, activation=tf.nn.sigmoid, reuse=reuse)
 
         return logits, final_state
