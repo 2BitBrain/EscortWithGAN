@@ -66,72 +66,86 @@ def decoder(x, args, cell, state, activation=tf.nn.sigmoid):
     indexs = tf.expand_dims(tf.transpose(tf.convert_to_tensor(indexs), (1,0)), axis=-1)
     return logits, prob, indexs
                           
-def converter(x, x_idx, args, name, reuse=False, extract_reuse=False):
-    ##using word level cnn's feature
-    ##input shapes are (None, max_timestep, 1)
-    ##output shape are (None, max_timestep, 1) and return index which is highest probablistic.
-    extracted_feature = extract_feature(x_idx, args, extract_reuse)
-    #extracted_feature = tf.reshape(tf.convert_to_tensor([extracted_feature for _ in range(4)]),(-1, 4*args.gen_rnn_size))
-    with tf.variable_scope(name, reuse=reuse) as scope:
 
-        with tf.variable_scope(name+'Embedding', reuse=reuse) as scope:
-            rnn_inputs = []
-            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.rnn_embedding_size], dtype=tf.float32, name='embedding_weight')
-                
-            for t in range(args.max_time_step):
-                embedded = tf.nn.embedding_lookup(embedding_weight, x_idx[:,t,:])
-                rnn_inputs.append(embedded)
-            #print(tf.convert_to_tensor(rnn_inputs).get_shape().as_list())
-            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)), (-1, args.max_time_step, args.embedding_size))
+
+
+
+
+
+
+
+
+
+
+
+class Generator():
+    def __init__(x, p_x, go, args, name, reuse=False, extract_reuse=False):
+        extracted_feature = extract_feature(x, args, extract_reuse)*0.01
+        with tf.variable_scope(name, reuse=reuse) as scope:
+            #pre training
+            p_rnn_inputs = []
+            if args.embedding:
+                embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name='embedding_weight')
+                for t in range(args.max_time_step):
+                    embedded = tf.nn.embedding_lookup(embedding_weight, p_x[:,t,:])
+                    p_rnn_inputs.append(embedded)
+                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)), (-1, args.max_time_step, args.embedding_size))
+            else:
+                for t in range(args.max_time_step):
+                    if t!= 0:
+                        scope.reuse_variables()
+                    
+                    p_rnn_inputs.append(tf.layers.dense(p_x[:,t,:], self.args.embedding_size, tf.nn.relu, name="embedding_dense"))
+                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2)))
             
-        with tf.variable_scope(name+'RNN', reuse=reuse) as scope:
-            #cell_ = tf.contrib.rnn.MultiRNNCell([def_cell(args, args.gen_rnn_size) for _ in range(1)], state_is_tuple = True)     
-            cell_ = def_cell(args, args.gen_rnn_size, reuse)
-            rnn_outs, _ = tf.nn.dynamic_rnn(cell_, rnn_inputs, initial_state=extracted_feature, dtype=tf.float32)
+            encoder_cell = def_cell(args, args.gen_rnn_size)
+            _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
+            if args.use_extracted_feature:
+                decoder_cell = def_cell(args, args.gen_rnn_size + 576)
+                state = tf.concat([final_state, extracted_feature], axis=-1)
+                noise = tf.random_normal(shape=tf.shape(state), mean=0., stddev=1., dtype=tf.float32)
+                state = tf.nn.tanh(state+noise)
+            else:
+                state = final_state
+                decoder_cell = def_cell(args, args.gen_rnn_size)
+            
+            
 
-        with tf.variable_scope(name+"Dense") as scope:
-            logits = []
-            outputs = []
-            indexs = []
-            for t in range(args.max_time_step):
-                if t != 0:
-                    tf.get_variable_scope().reuse_variables()
-                logit = tf.layers.dense(rnn_outs[:,t,:], args.vocab_size, activation=tf.nn.sigmoid, name="rnn_dense")
-                out = tf.nn.softmax(logit)
-                logits.append(logit)
-                outputs.append(out)
-                indexs.append(tf.to_int32(tf.expand_dims(tf.argmax(out, axis=-1), axis=-1)))
-            logits = tf.transpose(tf.convert_to_tensor(logits), (1,0,2))
-            outputs = tf.transpose(tf.convert_to_tensor(outputs), (1,0,2))
-            indexs = tf.transpose(tf.convert_to_tensor(indexs), (1,0,2))
-        return logits, outputs, indexs
-
-def converter_(x, go, args, name, reuse=False, extract_reuse=False):
-    extracted_feature = extract_feature(x, args, extract_reuse)*0.01
-    with tf.variable_scope(name, reuse=reuse) as scope:
-       
-        print(tf.contrib.framework.get_name_scope())
-        with tf.variable_scope(name+"Embedding", reuse=reuse) as scope:
+            scope.reuse_variables()
+            #training
             rnn_inputs = []
-            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
+            if args.embedding:
+                embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
 
-            for t in range(args.max_time_step):
-                embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
-                rnn_inputs.append(embedded)
-            #print(tf.convert_to_tensor(rnn_inputs).get_shape().as_list())
-            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
+                for t in range(args.max_time_step):
+                    embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
+                    rnn_inputs.append(embedded)
+                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
+            else:
+                for t in range(args.max_time_step):
+                    if t != 0:
+                        scope().reuse_variables()
 
-        with tf.variable_scope(name+"Encoder", reuse=reuse) as scope:
-            encoder_cell = def_cell(args, args.gen_rnn_size, reuse)
-            rnn_outs, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
+                    rnn_inputs.append(tf.layers.dense(x[:,t,:], self.args.embedding_size, tf.nn.relu, name="embedding_dense"))
+                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2)))
+
+            _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
-        with tf.variable_scope(name+"Decoder", reuse=reuse) as scope:
-            decoder_cell = def_cell(args, args.gen_rnn_size+576, reuse)
-            state = tf.concat([final_state, extracted_feature], axis=-1)
-            noise = tf.random_normal(shape=tf.shape(state), mean=0.0, stddev=1., dtype=tf.float32)
-            state = tf.nn.tanh(state+noise)
-            logits, prob, indexs = decoder(go , args, decoder_cell, state)
-    return  logits, prob, indexs
+            if args.use_extracted_feature:
+
+            else:
+        
+            outputs = []
+            out = go
+            for t in range(args.max_time_step):
+                if t!= 0:
+                    scope.reuse_variables()
+
+                input_ = tf.layers.dense(go, self.args.embedding_size, tf.nn.relu, "decoder_embedding_dense")
+                rnn_output_, state_ = cell(input_, state)
+                output_ = tf.nn.softmax(tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense"))
+                outputs.append(output_)
+            self.outputs = tf.transpose(outputs, (1,0,2))
 
 def discriminator(x, args, name, reuse=False): 
     with tf.variable_scope(name, reuse=reuse) as scope:
