@@ -70,6 +70,7 @@ class Generator():
     def __init__(x, p_e_x, p_d_x, go, args, name, reuse=False, extract_reuse=False):
         extracted_feature = extract_feature(x, args, extract_reuse)*0.01
         with tf.variable_scope(name, reuse=reuse) as scope:
+            scope.set_regularizer(tf.contrib.layers.l2_regularizer(scale=args.scale))
             #pre training
             p_rnn_inputs = []
             if args.encoder_embedding:
@@ -171,6 +172,14 @@ class Generator():
                     out = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
                     outputs.append(out)
             self.outputs = tf.transpose(outputs, (1,0,2))
+            self.reg_loss = args.reg_constant * sum(reg_losses)
+
+    def pre_train(self, y):
+        loss = tf.reduce_mean(tf.squared_difference(self.p_outputs, y)) + self.reg_loss
+        return loss
+
+    def logits(self):
+        return self.outputs
 
 def discriminator(x, args, name, reuse=False): 
     with tf.variable_scope(name, reuse=reuse) as scope:
