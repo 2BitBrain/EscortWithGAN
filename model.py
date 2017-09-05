@@ -38,7 +38,7 @@ class model():
 
         self.pos_inps = tf.placeholder(dtype=dtype, shape=shape)
         self.neg_inps = tf.placeholder(dtype=dtype, shape=shape)
-        self.go = tf.placeholder(dtype=dtype, shape=[None, args.max_time_step, 1] if args.embedding [None, args.max_time_step, args.vocab_size])
+        self.go = tf.placeholder(dtype=dtype, shape=[None, args.max_time_step, 1] if args.embedding  else [None, args.max_time_step, args.vocab_size])
 
         self.pos_pretrain_e_input = tf.placeholder(dtype=dtype, shape=shape)
         self.pos_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
@@ -72,8 +72,7 @@ class model():
         loss_d_n = tf.reduce_mean(tf.square(1-dis_n_real)) + tf.reduce_mean(tf.square(dis_n_fake))
         self.d_loss = loss_d_n + loss_d_p
 
-        cycle_loss = tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_)))\ 
-                    +tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_)))
+        cycle_loss = tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_)))
 
         loss_g_p = tf.reduce_mean(tf.square(1 - dis_p_fake))
         loss_g_n = tf.reduce_mean(tf.square(1 - dis_n_fake))
@@ -164,6 +163,7 @@ if __name__ == "__main__":
     parser.add_argument("--gen_rnn_size", dest="gen_rnn_size", type=int, default=1024)
     parser.add_argument("--dis_rnn_size", dest="dis_rnn_size", type=int, default=576)
     parser.add_argument("--merged_all", dest="merged_all", type=bool, default=False)
+    parser.add_argument("--embedding", dest="embedding", type=bool, default=False)
     args= parser.parse_args()
     
     if not os.path.exists("save"):

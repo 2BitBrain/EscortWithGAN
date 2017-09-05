@@ -47,7 +47,7 @@ def extract_feature(x, args, reuse=False):
             convded = tf.concat([cnn_output for cnn_output in convded], axis=-1)
     return  tf.contrib.layers.flatten(convded)
 
-def generator(x, p_d_x, go, args, e_cell, d_cell, name, reuse=False, extract_reuse=False , pre_train=True):
+def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reuse=False , pre_train=True):
     extracted_feature = extract_feature(x, args, extract_reuse)*0.01
     with tf.variable_scope(name, reuse=reuse):
         if reuse:
@@ -106,7 +106,7 @@ def generator(x, p_d_x, go, args, e_cell, d_cell, name, reuse=False, extract_reu
                 rnn_output_, state = decoder_cell(input_, state)
                 out_ = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
                 if t < args.max_time_step - 1:
-                    out = out_ if not pre_train else p_d_x[:,t+1,;]
+                    out = out_ if not pre_train else p_d_x[:,t+1,:]
                 outputs.append(out_)
                 
         outputs = tf.transpose(outputs, (1,0,2))
