@@ -63,17 +63,24 @@ class model():
         neg2pos_,_,_,_ = generator(self.pos2neg, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
         pos2neg_,_,_,_ = generator(self.neg2pos, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
 
-    
+        dis_p_real, p_cell = discriminator(self.pos_inps, None, args, "discriminator_pos", False)
+        dis_n_real, n_cell = discriminator(self.neg_inps, None, args, "discriminator_neg", False)
+        dis_p_fake, _ = discriminator(self.neg2pos, p_cell, args, "discriminator_pos", True)
+        dis_n_fake, _ = discriminator(self.pos2neg, n_cell, args, "discriminator_neg", True)
 
-       #####end training #####
+        loss_d_p = tf.reduce_mean(tf.square(1-dis_p_real)) + tf.reduce_mean(tf.square(dis_p_fake))
+        loss_d_n = tf.reduce_mean(tf.square(1-dis_n_real)) + tf.reduce_mean(tf.square(dis_n_fake))
+        self.d_loss = loss_d_n + loss_d_p
 
-        self.d_loss = self.loss_d_n + self.loss_d_p
+        cycle_loss = tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_)))\ 
+                    +tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_)))
 
-        self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) #+ args.l1_lambda*tf.reduce_mean(tf.abs(self.pos_inps - neg_pos_outs))
-        self.loss_g_n = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.ones_like(dis_fake_neg))) #+ args.l1_lambda*tf.reduce_mean(tf.abs(self.neg_inps - pos_neg_outs))
+        loss_g_p = tf.reduce_mean(tf.square(1 - dis_p_fake))
+        loss_g_n = tf.reduce_mean(tf.square(1 - dis_n_fake))
+        self.g_loss = (loss_g_n + loss_g_p) / 2 + cycle_loss
 
-        self.g_loss = self.loss_g_n + self.loss_g_p# + l_n + l_p
-
+        #####end training #####
+        
         with tf.variable_scope("summary") as scope:
             tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)
             tf.summary.scalar("discriminator_neg_loss", self.loss_d_n)
@@ -81,12 +88,12 @@ class model():
             tf.summary.scalar("generator_neg_loss", self.loss_g_n)
 
         var_ = tf.trainable_variables()
-        self.var_d_p = [var for var in var_ if  "dis_pos" in var.name]
-        self.var_d_n = [var for var in var_ if  "dis_neg" in var.name]
-        self.var_g_p = [var for var in var_ if  "converter_neg2pos" in var.name]
-        self.var_g_n = [var for var in var_ if  "converter_pos2neg" in var.name]
-        self.var_d = [var for var in var_ if "dis" in var.name]
-        self.var_g = [var for var in var_ if "converter" in var.name]
+        self.var_d_p = [var for var in var_ if  "discriminator_pos" in var.name]
+        self.var_d_n = [var for var in var_ if  "discriminator_neg" in var.name]
+        self.var_g_p = [var for var in var_ if  "g_neg2pos" in var.name]
+        self.var_g_n = [var for var in var_ if  "gr_pos2neg" in var.name]
+        self.var_d = self.var_d_n + self.var_d_p
+        self.var_g = self.var_g_n + self.var_g_n
         
     def train(self):
        # opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p, var_list=self.var_d_p)
