@@ -114,36 +114,24 @@ def generator(x, p_d_x, go, args, e_cell, d_cell, name, reuse=False, extract_reu
         reg_loss = args.reg_constant * sum(reg_losses)
         return outputs, reg_loss, encoder_cell, decoder_cell
         
-def discriminator(x, args, name, reuse=False): 
-    with tf.variable_scope(name, reuse=reuse) as scope:
+def discriminator(x, cell, args, name, reuse=False): 
+    with tf.variable_scope(name):
+        if reuse: 
+            tf.get_variable_scope().reuse_variables()
 
-        print(tf.contrib.framework.get_name_scope())
-        with tf.variable_scope(name+"RNN", reuse=reuse) as scope:
-            if args.cell_model == 'rnn':
-                cell_fn = tf.contrib.rnn.BasicRNNCell
-            elif args.cell_model == 'gru':
-                cell_fn = tf.contrib.rnn.GRUCell
-            elif args.cell_model == 'lstm':
-                pass
-            else:
-                raise Exception("model type not supported: {}".format(args.cell_model))
- 
-            cell_ = cell_fn(args.dis_rnn_size, reuse=reuse)
-            #if args.keep_prob < 1.:
-            #    cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=args.keep_prob)
-        
-            rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), scope=name+"d_rnn",dtype=tf.float32) 
+        cell_ = cell if not cell == None else def_cell(args, args.dis_rnn_size)
+        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), scope=name+"d_rnn",dtype=tf.float32) 
 
-        with tf.variable_scope(name+"Dense", reuse=reuse) as scope:
-            if args.merged_all:
-                outputs = []
-                for t in range(args.max_time_step):
-                    if t != 0:
-                        tf.get_variable_scope().reuse_variables()
 
-                    outputs.append(tf.layers.dense(rnn_outputs[:,t,:], 1, activation=tf.nn.sigmoid, name="rnn_out_dense"))
-                logits = tf.reduce_sum(tf.transpose(tf.convert_to_tensor(outputs),(1,0,2)), axis=1)
-            else:
-                logits = tf.layers.dense(rnn_outputs[-1], 1, activation=tf.nn.sigmoid, reuse=reuse)
+        if args.merged_all:
+            outputs = []
+            for t in range(args.max_time_step):
+                if t != 0:
+                    tf.get_variable_scope().reuse_variables()
 
-        return logits, final_state
+                outputs.append(tf.layers.dense(rnn_outputs[:,t,:], 1, activation=tf.nn.sigmoid, name="rnn_out_dense"))
+            logits = tf.reduce_sum(tf.transpose(tf.convert_to_tensor(outputs),(1,0,2)), axis=1)
+        else:
+            logits = tf.layers.dense(rnn_outputs[-1], 1, activation=tf.nn.sigmoid, reuse=reuse)
+
+        return logits, cell_
