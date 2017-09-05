@@ -40,32 +40,31 @@ class model():
         self.neg_inps = tf.placeholder(dtype=dtype, shape=shape)
         self.go = tf.placeholder(dtype=dtype, shape=[None, args.max_time_step, 1] if args.embedding [None, args.max_time_step, args.vocab_size])
 
-        self.pos_pretrain_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.pos_pretrain_e_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.pos_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
         self.pos_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
         
-        self.neg_pretrain_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.neg_pretrain_e_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.neg_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
         self.neg_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
         
-        
-        _, self.neg_outs, neg_indexs = converter_(self.pos_inps_indexs, self.go, args, "converter_pos2neg")
-        _, self.pos_outs, pos_indexs = converter_(self.neg_inps_indexs, self.go, args, "converter_neg2pos", extract_reuse=True)
-        print(neg_indexs.get_shape().as_list())
-        _, neg_pos_outs, neg_pos_indexs = converter_(neg_indexs, self.go, args, "converter_neg2pos", True, True)
-        _, pos_neg_outs, pos_neg_indexs = converter_(pos_indexs, self.go, args, "converter_pos2neg", True, True)
+       #####start pre training#####
+        pos2neg = Generator(self.pos_inps, self.pos_pretrain_e_input, self.pos_pretrain_d_input, self.go, args, "g_pos2neg", False, False) 
+        neg2pos = Generator(self.neg_inps, self.neg_pretrain_e_input, self.neg_pretrain_d_input, self.go, args, "g_neg2pos", False, True)
 
-              
-        dis_pos, pos_state= discriminator(self.pos_inps, args, "dis_pos")
-        dis_fake_pos, fake_pos_state = discriminator(self.pos_outs, args, "dis_pos", reuse=True)    
-        
-        dis_neg, neg_state = discriminator(self.neg_inps, args, "dis_neg")
-        dis_fake_neg, fake_neg_state = discriminator(self.neg_outs, args, "dis_neg", reuse=True)
-        
-        l_p = tf.reduce_mean(tf.abs(pos_state - fake_pos_state))
-        l_n = tf.reduce_mean(tf.abs(neg_state - fake_neg_state))
+        self.p_p2n_loss = pos2neg.pre_train(self.pos_pretrain_label) 
+        self.p_n2p_loss = pos2neg.pre_train(self.neg_pretrain_label)
 
-        self.loss_d_p = (tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_pos, labels=tf.ones_like(dis_pos))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.zeros_like(dis_fake_pos))))/2
-        self.loss_d_n = (tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_neg, labels=tf.ones_like(dis_neg))) + tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_neg, labels=tf.zeros_like(dis_fake_neg))))/2
+       #####end pre training #####
         
+
+
+       #####start training #####
+
+
+
+       #####end training #####
+
         self.d_loss = self.loss_d_n + self.loss_d_p
 
         self.loss_g_p = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=dis_fake_pos, labels=tf.ones_like(dis_fake_pos))) #+ args.l1_lambda*tf.reduce_mean(tf.abs(self.pos_inps - neg_pos_outs))
