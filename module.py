@@ -47,26 +47,6 @@ def extract_feature(x, args, reuse=False):
             convded = tf.concat([cnn_output for cnn_output in convded], axis=-1)
     return  tf.contrib.layers.flatten(convded)
 
-def decoder(x, args, cell, state, activation=tf.nn.sigmoid):
-    logits = []
-    probablistic = []
-    indexs = []
-    for t in range(args.max_time_step):
-        if t != 0:
-            tf.get_variable_scope().reuse_variables()
-
-        out, state = cell(x, state)
-        logit = tf.layers.dense(out, args.vocab_size, activation=activation, name="rnn_out_dense")
-        logits.append(logit)
-        probablistic.append(tf.nn.softmax(logit))
-        indexs.append(tf.argmax(tf.nn.softmax(logit), axis=-1))
-        x =tf.nn.softmax(logit) 
-    logits = tf.transpose(tf.convert_to_tensor(logits), (1,0,2))
-    prob = tf.transpose(tf.convert_to_tensor(probablistic), (1,0,2))
-    indexs = tf.expand_dims(tf.transpose(tf.convert_to_tensor(indexs), (1,0)), axis=-1)
-    return logits, prob, indexs
-                          
-
 def generator(x, p_d_x, go, args, e_cell, d_cell, name, reuse=False, extract_reuse=False , pre_train=True):
     extracted_feature = extract_feature(x, args, extract_reuse)*0.01
     with tf.variable_scope(name, reuse=reuse):
