@@ -49,22 +49,21 @@ class model():
         self.neg_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
         
        #####start pre training#####
-        pos2neg = Generator(self.pos_inps, self.pos_pretrain_e_input, self.pos_pretrain_d_input, self.go, args, "g_pos2neg", False, False) 
-        neg2pos = Generator(self.neg_inps, self.neg_pretrain_e_input, self.neg_pretrain_d_input, self.go, args, "g_neg2pos", False, True)
+        pos2pos, regu_p_loss = generator(self.pos_pretrain_e_input, self.pos_pretrain_d_input, None, args, "g_pos2neg", False, False, True) 
+        neg2neg, regu_n_loss = generator(self.neg_pretrain_e_input, self.neg_pretrain_d_input, None, args, "g_neg2pos", False, True, True)
 
-        self.p_p2n_loss = pos2neg.pre_train(self.pos_pretrain_label) 
-        self.p_n2p_loss = pos2neg.pre_train(self.neg_pretrain_label)
+        self.p_p_loss = tf.squared_difference(pos2pos, self.pos_pretrain_label) + regu_p_loss
+        self.p_n_loss = tf.squared_difference(neg2neg, self.neg_pretrain_label) + regu_n_loss
 
-       #####end pre training #####
-        fake_p2n = pos2neg.logits()
-        fake_n2p = pos2neg.logits()
-
-        fake_p2n_n2p = 
-
+       #####end pre training #### 
 
        #####start training #####
+        self.pos2neg = generator(self.pos_inps, None, self.go, args, "g_pos2neg", True, True, False)
+        self.neg2pos = generator(self.neg_inps, None, self.go, args, "g_neg2pos", True, True, True)
+        neg2pos_ = generator(self.pos2neg, None, self.go, args, "g_neg2pos", True, True, False)
+        pos2neg_ = generator(self.neg2pos, None, self.go, args, "g_pos2neg", True, True, False)
 
-
+        
 
        #####end training #####
 

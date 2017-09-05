@@ -67,11 +67,12 @@ def decoder(x, args, cell, state, activation=tf.nn.sigmoid):
     return logits, prob, indexs
                           
 
-def generator(x, p_d_x, go, args, name, reuse=False, extract_reuse=False , pre_train=True):
+def generator(x, p_d_x, go, args, e_cell, d_cell, name, reuse=False, extract_reuse=False , pre_train=True):
     extracted_feature = extract_feature(x, args, extract_reuse)*0.01
     with tf.variable_scope(name, reuse=reuse):
         if reuse:
-            tf.get
+            tf.get_variable_scope().reuse_variables()
+
         scope.set_regularizer(tf.contrib.layers.l2_regularizer(scale=args.scale))
         rnn_inputs = []
         if args.embedding:
