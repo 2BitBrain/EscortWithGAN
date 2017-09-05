@@ -13,28 +13,47 @@ import random
 class model():
     def __init__(self, args):
         self.args = args 
-         
-        self.pos_inps = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size])
-        self.pos_inps_indexs = tf.placeholder(dtype=tf.int32, shape=[None, args.max_time_step, 1])
-        self.neg_inps = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size])
-        self.neg_inps_indexs = tf.placeholder(dtype=tf.int32, shape=[None, args.max_time_step, 1])
-        self.go = tf.placeholder(dtype=tf.float32, shape=[None, args.vocab_size])
+        
+        ## Define feed items ##
+        # if args.embedding    #
+        #this model use tensor-#
+        #flow embeddign_look_-#
+        #up. and dtype is int32#
+        #                       #
+        ###################
 
-        #converted_neg, self.neg_outs, neg_indexs = converter(self.pos_inps, self.pos_inps_indexs, args, "converter_pos2neg")
-        #converted_pos, self.pos_outs, pos_indexs = converter(self.neg_inps, self.neg_inps_indexs, args, "converter_neg2pos", extract_reuse=True)
-       
-        #converted_neg_pos, neg_pos_outs, neg_pos_indexs = converter(converted_neg, neg_indexs, args, "converter_neg2pos", reuse=True, extract_reuse=True)
-        #converted_pos_neg, pos_neg_outs, pos_neg_indexs = converter(converted_pos, pos_indexs, args, "converter_pos2neg", reuse=True, extract_reuse=True)
+        """
+        @param  pos_inps Feeded item for generator which is converting pos2neg. 
+        @param  neg_inps Feeded item for generator which is converting neg2pos.
+        @param  go feeded item for generator which is initial decoder part.
+        @param (pos_pretrain_input&neg_pretrain_input) Feeded itemf for pre training generator
+        """
 
+        if args.embedding:
+            shape = [None, args.max_time_step, 1]
+            dtype = tf.int32
+        else:
+            shape = [None, args.max_time_step, args.vocab_size]
+            dtype=tf.float32
+
+        self.pos_inps = tf.placeholder(dtype=dtype, shape=shape)
+        self.neg_inps = tf.placeholder(dtype=dtype, shape=shape)
+        self.go = tf.placeholder(dtype=dtype, shape=[None, args.max_time_step, 1] if args.embedding [None, args.max_time_step, args.vocab_size])
+
+        self.pos_pretrain_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.pos_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
+        
+        self.neg_pretrain_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.neg_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
+        
+        
         _, self.neg_outs, neg_indexs = converter_(self.pos_inps_indexs, self.go, args, "converter_pos2neg")
         _, self.pos_outs, pos_indexs = converter_(self.neg_inps_indexs, self.go, args, "converter_neg2pos", extract_reuse=True)
         print(neg_indexs.get_shape().as_list())
         _, neg_pos_outs, neg_pos_indexs = converter_(neg_indexs, self.go, args, "converter_neg2pos", True, True)
         _, pos_neg_outs, pos_neg_indexs = converter_(pos_indexs, self.go, args, "converter_pos2neg", True, True)
 
-        #l_p = tf.reduce_mean(tf.abs(extract_feature(self.pos_inps_indexs, args, True) - extract_feature(neg_pos_indexs, args, True)))
-        #l_n = tf.reduce_mean(tf.abs(extract_feature(self.neg_inps_indexs, args, True) - extract_feature(pos_neg_indexs, args, True)))
-         
+              
         dis_pos, pos_state= discriminator(self.pos_inps, args, "dis_pos")
         dis_fake_pos, fake_pos_state = discriminator(self.pos_outs, args, "dis_pos", reuse=True)    
         
