@@ -66,122 +66,69 @@ def decoder(x, args, cell, state, activation=tf.nn.sigmoid):
     indexs = tf.expand_dims(tf.transpose(tf.convert_to_tensor(indexs), (1,0)), axis=-1)
     return logits, prob, indexs
                           
-class Generator():
-    def __init__(self, x, p_e_x, p_d_x, go, args, name, reuse=False, extract_reuse=False):
-        extracted_feature = extract_feature(x, args, extract_reuse)*0.01
-        with tf.variable_scope(name, reuse=reuse) as scope:
-            scope.set_regularizer(tf.contrib.layers.l2_regularizer(scale=args.scale))
-            #pre training
-            p_rnn_inputs = []
-            if args.encoder_embedding:
-                embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name='embedding_weight')
-                for t in range(args.max_time_step):
-                    embedded = tf.nn.embedding_lookup(embedding_weight, p_e_x[:,t,:])
-                    p_rnn_inputs.append(embedded)
-                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)), (-1, args.max_time_step, args.embedding_size))
-            else:
-                for t in range(args.max_time_step):
-                    if t!= 0:
-                        scope.reuse_variables()        
-                    p_rnn_inputs.append(tf.layers.dense(p_e_x[:,t,:], self.args.embedding_size, tf.nn.relu, name="embedding_dense"))
-                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2)))
-            
-            encoder_cell = def_cell(args, args.gen_rnn_size)
-            _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
-            
-            if args.use_extracted_feature:
-                decoder_cell = def_cell(args, args.gen_rnn_size + 576)
-                state = tf.concat([final_state, extracted_feature], axis=-1)
-                noise = tf.random_normal(shape=tf.shape(state), mean=0., stddev=1., dtype=tf.float32)
-                state = tf.nn.tanh(state+noise)
-            else:
-                state = final_state
-                decoder_cell = def_cell(args, args.gen_rnn_size)
-            
-            outputs = []
-            out = go
-            if args.decoder_embedding:
-                d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "d_embedding_weight")
-                for t in range(args.max_time_step):
-                    if t != 0:
-                        scope.reuse_variables()
 
-                    d_embedded = tf.nn.embedding_lookup(d_embedding_weight, out)
-                    rnn_output_, state = decoder_cell(d_embedded, state)
-                    out_ = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
-                    out = tf.argmax(out_, axis=-1)
-                    outputs.append(out_)
-            else:
-                for t in range(args.max_time_step):
-                    if t != 0:
-                        scope.reuse_variables()
+def generator(x, p_d_x, go, args, name, reuse=False, extract_reuse=False , pre_train=True):
+    extracted_feature = extract_feature(x, args, extract_reuse)*0.01
+    with tf.variable_scope(name, reuse=reuse):
+        if reuse:
+            tf.get
+        scope.set_regularizer(tf.contrib.layers.l2_regularizer(scale=args.scale))
+        rnn_inputs = []
+        if args.embedding:
+            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
 
-                    input_ = tf.layers.dense(out, self.args.embedding_size, tf.nn.relu, "decoder_embedding_dense")
-                    rnn_output_, state = decoder_cell(input_, state)
-                    out = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
-                    outputs.append(out)
-            self.p_outputs = tf.transpose(outputs, (1,0,2))
+            for t in range(args.max_time_step):
+                embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
+                rnn_inputs.append(embedded)
+            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
+        else:
+            for t in range(args.max_time_step):
+                if t != 0:
+                    scope().reuse_variables()
 
-            scope.reuse_variables()
+                rnn_inputs.append(tf.layers.dense(x[:,t,:], self.args.embedding_size, tf.nn.relu, name="embedding_dense"))
+            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2)))
 
-            #training
-            rnn_inputs = []
-            if args.embedding:
-                embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
-
-                for t in range(args.max_time_step):
-                    embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
-                    rnn_inputs.append(embedded)
-                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
-            else:
-                for t in range(args.max_time_step):
-                    if t != 0:
-                        scope().reuse_variables()
-
-                    rnn_inputs.append(tf.layers.dense(x[:,t,:], self.args.embedding_size, tf.nn.relu, name="embedding_dense"))
-                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2)))
-
-            _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
+        _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
-            if args.use_extracted_feature:
-                state = tf.concat([final_state, extracted_feature], axis=-1)
-                noise = tf.random_normal(shape=tf.shape(state), mean=0., stddev=1., dtype=tf.float32)
-                state = tf.nn.tanh(state+noise)
-            else:
-                state = final_state
+        if args.use_extracted_feature:
+            state = tf.concat([final_state, extracted_feature], axis=-1)
+            noise = tf.random_normal(shape=tf.shape(state), mean=0., stddev=1., dtype=tf.float32)
+            state = tf.nn.tanh(state+noise)
+        else:
+            state = final_state
 
-            outputs = []
-            out = go
-            if args.decoder_embedding:
-                d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initial_state=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
-                for t in range(args.max_time_step):
-                    if t != 0:
-                        scope.reuse_variables()
+        outputs = []
+        out = go if not pre_train else p_d_x[:,0,:]
+        if args.decoder_embedding:
+            d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initial_state=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
+            for t in range(args.max_time_step):
+                if t != 0:
+                    scope.reuse_variables()
                     
-                    d_embedded = tf.nn.embedding_lookup(d_embedding_weight, out)
-                    rnn_output_, state = decoder_cell(d_embedded, state)
-                    out_ = tf.layers.dense(rnn_output_, args.vocab_size, name='rnn_out_dense')
-                    out = tf.argmax(out_, axis=-1)
-                    outputs.append(out_)
-            else:
-                for t in range(args.max_time_step):
-                    if t != 0:
-                        scope.reuse_variables()
+                d_embedded = tf.nn.embedding_lookup(d_embedding_weight, out)
+                rnn_output_, state = decoder_cell(d_embedded, state)
+                out_ = tf.layers.dense(rnn_output_, args.vocab_size, name='rnn_out_dense')
+                if t < args.max_time_step -1:
+                    out = tf.argmax(out_, axis=-1) if not pre_train else p_d_x[:,t+1,:]
+                outputs.append(out_)
+        else:
+            for t in range(args.max_time_step):
+                if t != 0:
+                    scope.reuse_variables()
 
-                    input_ = tf.layers.dense(out, self.args.embedding_size, tf.nn.relu, "docoder_embedding_dense")
-                    rnn_output_, state = decoder_cell(input_, state)
-                    out = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
-                    outputs.append(out)
-            self.outputs = tf.transpose(outputs, (1,0,2))
-            self.reg_loss = args.reg_constant * sum(reg_losses)
-
-    def pre_train(self, y):
-        loss = tf.reduce_mean(tf.squared_difference(self.p_outputs, y)) + self.reg_loss
-        return loss
-
-    def logits(self):
-        return self.outputs
-
+                input_ = tf.layers.dense(out, self.args.embedding_size, tf.nn.relu, "docoder_embedding_dense")
+                rnn_output_, state = decoder_cell(input_, state)
+                out_ = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
+                if t < args.max_time_step - 1:
+                    out = out_ if not pre_train else p_d_x[:,t+1,;]
+                outputs.append(out_)
+                
+        outputs = tf.transpose(outputs, (1,0,2))
+        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        reg_loss = args.reg_constant * sum(reg_losses)
+        return outputs, reg_loss
+        
 def discriminator(x, args, name, reuse=False): 
     with tf.variable_scope(name, reuse=reuse) as scope:
 

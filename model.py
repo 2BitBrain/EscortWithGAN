@@ -56,7 +56,10 @@ class model():
         self.p_n2p_loss = pos2neg.pre_train(self.neg_pretrain_label)
 
        #####end pre training #####
-        
+        fake_p2n = pos2neg.logits()
+        fake_n2p = pos2neg.logits()
+
+        fake_p2n_n2p = 
 
 
        #####start training #####
