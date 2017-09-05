@@ -89,18 +89,22 @@ def generator(x, p_d_x, go, args, e_cell, d_cell, name, reuse=False, extract_reu
 
                 rnn_inputs.append(tf.layers.dense(x[:,t,:], self.args.embedding_size, tf.nn.relu, name="embedding_dense"))
             rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2)))
-
+        
+        encoder_cell = e_cell if not e_cell == None else def_cell(args, self.gen_rnn_size)
         _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
         if args.use_extracted_feature:
             state = tf.concat([final_state, extracted_feature], axis=-1)
             noise = tf.random_normal(shape=tf.shape(state), mean=0., stddev=1., dtype=tf.float32)
             state = tf.nn.tanh(state+noise)
+            size= args.gen_rnn_size + 576
         else:
             state = final_state
+            size = args.gen_rnn_size
 
         outputs = []
         out = go if not pre_train else p_d_x[:,0,:]
+        decoder_cell = d_cell if not d_cell == None else def_cell(args, size) 
         if args.decoder_embedding:
             d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initial_state=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
             for t in range(args.max_time_step):
@@ -128,7 +132,7 @@ def generator(x, p_d_x, go, args, e_cell, d_cell, name, reuse=False, extract_reu
         outputs = tf.transpose(outputs, (1,0,2))
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_loss = args.reg_constant * sum(reg_losses)
-        return outputs, reg_loss
+        return outputs, reg_loss, encoder_cell, decoder_cell
         
 def discriminator(x, args, name, reuse=False): 
     with tf.variable_scope(name, reuse=reuse) as scope:

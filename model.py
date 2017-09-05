@@ -49,8 +49,8 @@ class model():
         self.neg_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
         
        #####start pre training#####
-        pos2pos, regu_p_loss = generator(self.pos_pretrain_e_input, self.pos_pretrain_d_input, None, args, "g_pos2neg", False, False, True) 
-        neg2neg, regu_n_loss = generator(self.neg_pretrain_e_input, self.neg_pretrain_d_input, None, args, "g_neg2pos", False, True, True)
+        pos2pos, regu_p_loss, p_e_cell, p_d_cell = generator(self.pos_pretrain_e_input, self.pos_pretrain_d_input, None, None, None,args, "g_pos2neg", False, False, True) 
+        neg2neg, regu_n_loss, n_e_cell, n_d_cell = generator(self.neg_pretrain_e_input, self.neg_pretrain_d_input, None, None, None, args, "g_neg2pos", False, True, True)
 
         self.p_p_loss = tf.squared_difference(pos2pos, self.pos_pretrain_label) + regu_p_loss
         self.p_n_loss = tf.squared_difference(neg2neg, self.neg_pretrain_label) + regu_n_loss
@@ -58,12 +58,12 @@ class model():
        #####end pre training #### 
 
        #####start training #####
-        self.pos2neg = generator(self.pos_inps, None, self.go, args, "g_pos2neg", True, True, False)
-        self.neg2pos = generator(self.neg_inps, None, self.go, args, "g_neg2pos", True, True, True)
-        neg2pos_ = generator(self.pos2neg, None, self.go, args, "g_neg2pos", True, True, False)
-        pos2neg_ = generator(self.neg2pos, None, self.go, args, "g_pos2neg", True, True, False)
+        self.pos2neg,_, p_e_cell, p_d_cell = generator(self.pos_inps, None, self.go, p_e_cell, p_d_cell,args, "g_pos2neg", True, True, False)
+        self.neg2pos,_, n_e_cell, n_d_cell = generator(self.neg_inps, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, True)
+        neg2pos_,_,_,_ = generator(self.pos2neg, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
+        pos2neg_,_,_,_ = generator(self.neg2pos, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
 
-        
+    
 
        #####end training #####
 
