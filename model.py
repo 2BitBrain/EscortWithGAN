@@ -49,7 +49,7 @@ class model():
         self.neg_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
         
        #####start pre training#####
-        pos2pos, regu_p_loss, p_e_cell, p_d_cell = generator(self.pos_pretrain_e_input, self.pos_pretrain_d_input, None, None, None,args, "g_pos2neg", False, False, True) 
+        pos2pos, regu_p_loss, p_e_cell, p_d_cell = generator(self.pos_pretrain_e_input, self.pos_pretrain_d_input, None, None, None, args, "g_pos2neg", False, False, True) 
         neg2neg, regu_n_loss, n_e_cell, n_d_cell = generator(self.neg_pretrain_e_input, self.neg_pretrain_d_input, None, None, None, args, "g_neg2pos", False, True, True)
 
         self.p_p_loss = tf.squared_difference(pos2pos, self.pos_pretrain_label) + regu_p_loss
@@ -164,6 +164,10 @@ if __name__ == "__main__":
     parser.add_argument("--dis_rnn_size", dest="dis_rnn_size", type=int, default=576)
     parser.add_argument("--merged_all", dest="merged_all", type=bool, default=False)
     parser.add_argument("--embedding", dest="embedding", type=bool, default=False)
+    parser.add_argument("--scale", dest="scale", type=float, default=1.)  
+    parser.add_argument("--use_extracted_feature", dest="use_extracted_feature", type=bool, default=False)
+    parser.add_argument("--decoder_embedding", dest="decoder_embedding", type=bool, default=False)
+    parser.add_argument("--reg_constant", dest="reg_constant", type=float, default=1.)
     args= parser.parse_args()
     
     if not os.path.exists("save"):

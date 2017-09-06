@@ -16,6 +16,9 @@ def def_cell(args, rnn_size, reuse=False):
         return cell_
 
 def extract_feature(x, args, reuse=False):
+    if not args.embedding:
+        x = tf.expand_dims(tf.argmax(x, axis=-1), axis=-1)
+    
     with tf.variable_scope("Word_Level_CNN", reuse=reuse) as scope:
         if reuse:
             scope.reuse_variables()
@@ -49,28 +52,33 @@ def extract_feature(x, args, reuse=False):
 
 def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reuse=False , pre_train=True):
     extracted_feature = extract_feature(x, args, extract_reuse)*0.01
-    with tf.variable_scope(name, reuse=reuse):
+    with tf.variable_scope(name, reuse=reuse) as scope:
         if reuse:
             tf.get_variable_scope().reuse_variables()
-
-        scope.set_regularizer(tf.contrib.layers.l2_regularizer(scale=args.scale))
-        rnn_inputs = []
-        if args.embedding:
-            embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
-
-            for t in range(args.max_time_step):
-                embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
-                rnn_inputs.append(embedded)
-            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
-        else:
-            for t in range(args.max_time_step):
-                if t != 0:
-                    scope().reuse_variables()
-
-                rnn_inputs.append(tf.layers.dense(x[:,t,:], self.args.embedding_size, tf.nn.relu, name="embedding_dense"))
-            rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2)))
         
-        encoder_cell = e_cell if not e_cell == None else def_cell(args, self.gen_rnn_size)
+        scope.set_regularizer(tf.contrib.layers.l2_regularizer(scale=args.scale))
+        with tf.variable_scope("embedding"):
+            if reuse:
+                tf.get_variable_scope().reuse_variables()
+
+            rnn_inputs = []
+            if args.embedding:
+                embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
+
+                for t in range(args.max_time_step):
+                    embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
+                    rnn_inputs.append(embedded)
+                rnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,3,2)),(-1, args.max_time_step, args.embedding_size))
+            else:
+                for t in range(args.max_time_step):
+                    if t != 0:
+                        tf.get_variable_scope().reuse_variables()
+
+                    rnn_inputs.append(tf.layers.dense(x[:,t,:], args.embedding_size, tf.nn.relu, name="embedding_dense"))
+                rnn_inputs = tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2))
+        
+        encoder_cell = e_cell if not e_cell == None else def_cell(args, args.gen_rnn_size)
+        print(type(encoder_cell))
         _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
         if args.use_extracted_feature:
@@ -89,7 +97,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
             d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initial_state=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
             for t in range(args.max_time_step):
                 if t != 0:
-                    scope.reuse_variables()
+                    tf.get_variable_scope().reuse_variables()
                     
                 d_embedded = tf.nn.embedding_lookup(d_embedding_weight, out)
                 rnn_output_, state = decoder_cell(d_embedded, state)
@@ -102,7 +110,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
                 if t != 0:
                     scope.reuse_variables()
 
-                input_ = tf.layers.dense(out, self.args.embedding_size, tf.nn.relu, "docoder_embedding_dense")
+                input_ = tf.layers.dense(out, args.embedding_size, tf.nn.relu, name="docoder_embedding_dense")
                 rnn_output_, state = decoder_cell(input_, state)
                 out_ = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
                 if t < args.max_time_step - 1:
