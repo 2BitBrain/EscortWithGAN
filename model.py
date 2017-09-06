@@ -121,7 +121,8 @@ class model():
             
             if self.args.pre_train and not self.args.pre_train_done:
                 print("## start to pre train ##")
-                for i in range
+                for i in range(self.args.p_itrs):
+                    pass
 
             elif self.args.pre_train:
                 if not os.path.exits(self.args.pre_train_path):
@@ -159,6 +160,7 @@ if __name__ == "__main__":
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
     parser.add_argument("--itrs", dest="itrs", type=int, default=1000001)
+    parser.add_argument("--p_itrs", dest="p_itrs", type=int, default=10000)
     parser.add_argument("--batch_size", dest="batch_size", type=int, default=4)
     parser.add_argument("--embedding_size", dest="embedding_size", default=64)
     parser.add_argument("--rnn_embedding_size", dest="rnn_embedding_size", type=int, default=64)

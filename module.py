@@ -78,7 +78,6 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
                 rnn_inputs = tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2))
         
         encoder_cell = e_cell if not e_cell == None else def_cell(args, args.gen_rnn_size)
-        print(type(encoder_cell))
         _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
         if args.use_extracted_feature:
