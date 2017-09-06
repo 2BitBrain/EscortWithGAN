@@ -98,6 +98,8 @@ class model():
         self.var_g = self.var_g_n + self.var_g_p
         
     def train(self):
+        opt_p_p = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_p_loss, var_list=self.var_g_n)
+        opt_p_n = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_n_loss, var_list=self.var_g_p)
         opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
 
@@ -122,14 +124,21 @@ class model():
             if self.args.pre_train and not self.args.pre_train_done:
                 print("## start to pre train ##")
                 for i in range(self.args.p_itrs):
-                    pass
+                    input_, label_ = hoge()
+                    p_loss, _ = sess.run([self.p_p_loss, opt_p_p])
+                    n_loss, _ = sess.run([self.p_n_loss, opt_p_n])
+
+                    if i % 30 == 0:print("p_loss:", p_loss,"   n_loss:", n_loss)
+                    if i % 60 == 0:p_saver.save(sess, self.args.pre_train_path)
+                pritn("## pre training done ! ##")
 
             elif self.args.pre_train:
                 if not os.path.exits(self.args.pre_train_path):
                     print("trained model file does not exits")
                     return 
                 
-                p_saver.restore(sess, self.args.pre_train_path)    
+                p_saver.restore(sess, self.args.pre_train_path)
+                print("## restore done ! ##")
 
             for itr in range(self.args.itrs):
                 pos_choiced_idx = random.sample(range(pos_data_size), self.args.batch_size)
