@@ -38,7 +38,7 @@ class model():
 
         self.pos_inps = tf.placeholder(dtype=dtype, shape=shape)
         self.neg_inps = tf.placeholder(dtype=dtype, shape=shape)
-        self.go = tf.placeholder(dtype=dtype, shape=[None, args.max_time_step, 1] if args.embedding  else [None, args.max_time_step, args.vocab_size])
+        self.go = tf.placeholder(dtype=dtype, shape=[None,  1] if args.embedding  else [None, args.vocab_size])
 
         self.pos_pretrain_e_input = tf.placeholder(dtype=dtype, shape=shape)
         self.pos_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
@@ -59,7 +59,7 @@ class model():
 
        #####start training #####
         self.pos2neg,_, p_e_cell, p_d_cell = generator(self.pos_inps, None, self.go, p_e_cell, p_d_cell,args, "g_pos2neg", True, True, False)
-        self.neg2pos,_, n_e_cell, n_d_cell = generator(self.neg_inps, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, True)
+        self.neg2pos,_, n_e_cell, n_d_cell = generator(self.neg_inps, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
         neg2pos_,_,_,_ = generator(self.pos2neg, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
         pos2neg_,_,_,_ = generator(self.neg2pos, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
 
@@ -70,9 +70,12 @@ class model():
 
         loss_d_p = tf.reduce_mean(tf.square(1-dis_p_real)) + tf.reduce_mean(tf.square(dis_p_fake))
         loss_d_n = tf.reduce_mean(tf.square(1-dis_n_real)) + tf.reduce_mean(tf.square(dis_n_fake))
-        self.d_loss = loss_d_n + loss_d_p
+        self.d_loss = (loss_d_n + loss_d_p)/2
 
-        cycle_loss = tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_)))
+        if not args.embedding:
+            cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_))))
+        else:
+            cycle_loss = 0.
 
         loss_g_p = tf.reduce_mean(tf.square(1 - dis_p_fake))
         loss_g_n = tf.reduce_mean(tf.square(1 - dis_n_fake))
@@ -81,24 +84,20 @@ class model():
         #####end training #####
         
         with tf.variable_scope("summary") as scope:
-            tf.summary.scalar("discriminator_pos_loss", self.loss_d_p)
-            tf.summary.scalar("discriminator_neg_loss", self.loss_d_n)
-            tf.summary.scalar("generator_pos_loss", self.loss_g_p)
-            tf.summary.scalar("generator_neg_loss", self.loss_g_n)
+            tf.summary.scalar("discriminator_pos_loss", loss_d_p)
+            tf.summary.scalar("discriminator_neg_loss", loss_d_n)
+            tf.summary.scalar("generator_pos_loss", loss_g_p)
+            tf.summary.scalar("generator_neg_loss", loss_g_n)
 
         var_ = tf.trainable_variables()
         self.var_d_p = [var for var in var_ if  "discriminator_pos" in var.name]
         self.var_d_n = [var for var in var_ if  "discriminator_neg" in var.name]
         self.var_g_p = [var for var in var_ if  "g_neg2pos" in var.name]
-        self.var_g_n = [var for var in var_ if  "gr_pos2neg" in var.name]
+        self.var_g_n = [var for var in var_ if  "g_pos2neg" in var.name]
         self.var_d = self.var_d_n + self.var_d_p
         self.var_g = self.var_g_n + self.var_g_n
         
     def train(self):
-       # opt_d_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_p, var_list=self.var_d_p)
-       # opt_d_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_d_n, var_list=self.var_d_n)
-       # opt_g_p = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_p, var_list=self.var_g_p)
-       # opt_g_n = tf.train.AdamOptimizer(self.args.lr).minimize(self.loss_g_n, var_list=self.var_g_n)
         opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
 
@@ -147,13 +146,13 @@ class model():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--lr", dest="lr", type=float, default= 0.002)
+    parser.add_argument("--lr", dest="lr", type=float, default= 0.1)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
     parser.add_argument("--cell_model", dest="cell_model", type=str, default="gru")
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
     parser.add_argument("--itrs", dest="itrs", type=int, default=1000001)
-    parser.add_argument("--batch_size", dest="batch_size", type=int, default=50)
+    parser.add_argument("--batch_size", dest="batch_size", type=int, default=4)
     parser.add_argument("--embedding_size", dest="embedding_size", default=64)
     parser.add_argument("--rnn_embedding_size", dest="rnn_embedding_size", type=int, default=64)
     parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
@@ -168,6 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_extracted_feature", dest="use_extracted_feature", type=bool, default=False)
     parser.add_argument("--decoder_embedding", dest="decoder_embedding", type=bool, default=False)
     parser.add_argument("--reg_constant", dest="reg_constant", type=float, default=1.)
+    parser.add_argument("--l_labmda", dest="l_lambda", type=float, default=1.)
     args= parser.parse_args()
     
     if not os.path.exists("save"):

@@ -111,6 +111,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
                     scope.reuse_variables()
 
                 input_ = tf.layers.dense(out, args.embedding_size, tf.nn.relu, name="docoder_embedding_dense")
+                print(input_.get_shape().as_list())
                 rnn_output_, state = decoder_cell(input_, state)
                 out_ = tf.layers.dense(rnn_output_, args.vocab_size, name="rnn_out_dense")
                 if t < args.max_time_step - 1:
