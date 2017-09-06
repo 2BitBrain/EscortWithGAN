@@ -119,17 +119,15 @@ class model():
             graph = tf.summary.FileWriter('./logs', sess.graph)
             merged_summary = tf.summary.merge_all()
             
-            print([var.name for var in tf.trainable_variables()])
+            
 
             for itr in range(self.args.itrs):
                 pos_choiced_idx = random.sample(range(pos_data_size), self.args.batch_size)
                 neg_choiced_idx = random.sample(range(neg_data_size), self.args.batch_size)
 
                 feed_dict = {self.pos_inps:pos_one_hot_sentences[pos_choiced_idx],self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps:neg_one_hot_sentences[neg_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx], self.go:go}
-                #_, loss_g_n = sess.run([opt_g_n, self.loss_g_n], feed_dict=feed_dict)
-                #_, loss_d_n = sess.run([opt_d_n, self.loss_d_n], feed_dict=feed_dict)
-                #_, loss_g_p = sess.run([opt_g_p, self.loss_g_p], feed_dict=feed_dict)
-                #_, loss_d_p = sess.run([opt_d_p, self.loss_d_p], feed_dict=feed_dict)
+                
+
                 _, loss_g = sess.run([opt_g, self.g_loss], feed_dict=feed_dict)
                 _, loss_d = sess.run([opt_d, self.d_loss], feed_dict=feed_dict)
 
@@ -168,6 +166,8 @@ if __name__ == "__main__":
     parser.add_argument("--decoder_embedding", dest="decoder_embedding", type=bool, default=False)
     parser.add_argument("--reg_constant", dest="reg_constant", type=float, default=1.)
     parser.add_argument("--l_labmda", dest="l_lambda", type=float, default=1.)
+    parser.add_argument("--pre_train", dest="pre_train", type=bool, default=True)
+    parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=False)
     args= parser.parse_args()
     
     if not os.path.exists("save"):
