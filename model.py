@@ -95,7 +95,7 @@ class model():
         self.var_g_p = [var for var in var_ if  "g_neg2pos" in var.name]
         self.var_g_n = [var for var in var_ if  "g_pos2neg" in var.name]
         self.var_d = self.var_d_n + self.var_d_p
-        self.var_g = self.var_g_n + self.var_g_n
+        self.var_g = self.var_g_n + self.var_g_p
         
     def train(self):
         opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
@@ -115,11 +115,20 @@ class model():
             saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.VARIABLES, scope='Word_Level_CNN'))
             saver.restore(sess, "./word_level_cnn_save/word_level_cnn_model.ckpt")
             saver_ = tf.train.Saver(tf.global_variables())
-
+            p_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.VARIABLES, ["g_neg2pos", "g_pos2neg"]))
             graph = tf.summary.FileWriter('./logs', sess.graph)
             merged_summary = tf.summary.merge_all()
             
-            
+            if self.args.pre_train and not self.args.pre_train_done:
+                print("## start to pre train ##")
+                for i in range
+
+            elif self.args.pre_train:
+                if not os.path.exits(self.args.pre_train_path):
+                    print("trained model file does not exits")
+                    return 
+                
+                p_saver.restore(sess, self.args.pre_train_path)    
 
             for itr in range(self.args.itrs):
                 pos_choiced_idx = random.sample(range(pos_data_size), self.args.batch_size)
