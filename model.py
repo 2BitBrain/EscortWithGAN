@@ -109,6 +109,8 @@ class model():
         
         go = mk_go(self.args.batch_size, self.args.vocab_size)
 
+        mk_pre_train_func, mk_train_func(self.args.data_dir+"train.txt", self.args.index_dir, self.args.max_time_step, self.args.embedding)
+
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.log_device_placement = True
@@ -180,7 +182,7 @@ if __name__ == "__main__":
     parser.add_argument("--gen_rnn_size", dest="gen_rnn_size", type=int, default=1024)
     parser.add_argument("--dis_rnn_size", dest="dis_rnn_size", type=int, default=576)
     parser.add_argument("--merged_all", dest="merged_all", type=bool, default=False)
-    parser.add_argument("--embedding", dest="embedding", type=bool, default=False)
+    parser.add_argument("--embedding", dest="embedding", type=bool, default=True)
     parser.add_argument("--scale", dest="scale", type=float, default=1.)  
     parser.add_argument("--use_extracted_feature", dest="use_extracted_feature", type=bool, default=False)
     parser.add_argument("--decoder_embedding", dest="decoder_embedding", type=bool, default=False)

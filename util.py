@@ -117,7 +117,7 @@ def visualizer(x, y, index_path, save_path):
     with open(save_path, "a") as fs:
         fs.write("\n".join(["{}  <-> {}".format(x,y) for x,y in zip(sentences_x, sentences_y)]))
 
-
+"""
 def mk_train_data(data_path, index_path, time_step):
     neg_sentences, pos_sentences = read_training_data(data_path)
     print(len(neg_sentences), len(pos_sentences))
@@ -138,3 +138,37 @@ def mk_train_data(data_path, index_path, time_step):
     pos_one_hot_sentences = convert_senteo2one_hot_encoding(pos_sentences, indexs, time_step)
     print("Done converting positive sentences to one hot vector")
     return neg_converted_sentences, neg_one_hot_sentences, pos_converted_sentences, pos_one_hot_sentences
+"""
+
+def mk_train_data(data_path, index_path, time_step,embedding=False):
+    neg_sentences, pos_sentences = read_training_data(data_path)
+    sentences = read_sentence_data(data_path)
+    if  not os.path.exists(index_path):
+        word = []
+        for r_text in sentences:
+            [word.append(word_) for word_ in r_text.split(' ')]
+        save_index(set(word), index_path)
+        
+    indexs = read_index(index_path)
+    
+    if embedding:
+        convert_func = convert_sentence2index
+    else:
+        convert_func = convert_sentence2one_hot_encoding
+        
+    def mk_pre_train_func(embedding=False):
+            in_neg = convert_func(neg_sentences, indexs, time_step)
+            d_in_neg = convert_func(neg_sentences, indexs, time_step, True)
+            d_label_neg = convert_sentence2one_hot_encoding(neg_sentences, indexs, time_step)[:,:,:]
+            
+            in_pos = convert_func(pos_sentences, indexs, time_step)
+            d_pos = convert_func(pos_sentences, indexs, time_step, True)
+            d_label_pos = convert_sentence2one_hot_encoding(pos_sentences, indexs, time_step)[:,:,:] 
+            return in_neg, d_in_neg, d_label_neg, in_pos, d_pos, d_label_pos
+
+    def mk_train_func(embedding=False):
+        in_neg = convert_func(neg_sentences, indexs, time_step)
+        in_pos = convert_func(pos_sentences, indexs, time_step)
+        return in_neg, in_pos
+    
+    return mk_pre_train_func, mk_train_func
