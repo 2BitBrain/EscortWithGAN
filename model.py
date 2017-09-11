@@ -61,17 +61,17 @@ class model():
         
         print(self.pos2neg.dtype)
 
-        cyc_inp = tf.expand_dims(tf.arg_max(self.pos2neg, 2), -1) if args.embedding else self.pos2neg
-        neg2pos_,_,_,_ = generator(cyc_inp, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
+        cyc_inp_p2n = tf.expand_dims(tf.arg_max(self.pos2neg, 2), -1) if args.embedding else self.pos2neg
+        neg2pos_,_,_,_ = generator(cyc_inp_p2n, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
 
-        print(self.pos2neg.get_shape().as_list())
-        cyc_inp = tf.expand_dims(tf.arg_max(self.neg2pos, 2), -1) if args.embedding else self.neg2pos
-        pos2neg_,_,_,_ = generator(cyc_inp, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
+        cyc_inp_n2p = tf.expand_dims(tf.arg_max(self.neg2pos, 2), -1) if args.embedding else self.neg2pos
+        pos2neg_,_,_,_ = generator(cyc_inp_n2p, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
 
         dis_p_real, p_cell = discriminator(self.pos_inps, None, args, "discriminator_pos", False)
         dis_n_real, n_cell = discriminator(self.neg_inps, None, args, "discriminator_neg", False)
-        dis_p_fake, _ = discriminator(self.neg2pos, p_cell, args, "discriminator_pos", True)
-        dis_n_fake, _ = discriminator(self.pos2neg, n_cell, args, "discriminator_neg", True)
+        
+        dis_p_fake, _ = discriminator(cyc_inp_n2p, p_cell, args, "discriminator_pos", True)
+        dis_n_fake, _ = discriminator(cyc_inp_p2n, n_cell, args, "discriminator_neg", True)
 
         loss_d_p = tf.reduce_mean(tf.square(1-dis_p_real)) + tf.reduce_mean(tf.square(dis_p_fake))
         loss_d_n = tf.reduce_mean(tf.square(1-dis_n_real)) + tf.reduce_mean(tf.square(dis_n_fake))

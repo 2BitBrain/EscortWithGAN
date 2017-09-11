@@ -127,13 +127,18 @@ def discriminator(x, cell, args, name, reuse=False):
         if reuse: 
             tf.get_variable_scope().reuse_variables()
         
-        with tf.variable_scope("embedding"):
-            if reuse:
-                tf.get_variable_scope().reuse_variables()
+        if args.embedding:
+            with tf.variable_scope("embedding"):
+                if reuse:
+                    tf.get_variable_scope().reuse_variables()
 
-            embedding_weight = tf.get_variable("d_embedding_weight", [args.vocab_size+2, args.embedding_size], dtype=tf.float32, initial_state=tf.contrib.layers.xavier_initializer())
-            for i in range()
-
+                embedded = []
+                embedding_weight = tf.get_variable("d_embedding_weight", [args.vocab_size+2, args.embedding_size], dtype=tf.float32, initializer=tf.contrib.layers.xavier_initializer())
+                for i in range(args.max_time_step):
+                    embedded.append(tf.nn.embedding_lookup(embedding_weight, x[:,i,:]))
+                embedded = tf.reshape(tf.convert_to_tensor(embedded), (args.max_time_step,-1,args.embedding_size))
+                x = tf.transpose(embedded, (1,0,2))
+        
         cell_ = cell if not cell == None else def_cell(args, args.dis_rnn_size)
         rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), scope=name+"d_rnn", dtype=tf.float32) 
 
