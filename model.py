@@ -117,7 +117,7 @@ class model():
             saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.VARIABLES, scope='Word_Level_CNN'))
             saver.restore(sess, "./word_level_cnn_save/word_level_cnn_model.ckpt")
             saver_ = tf.train.Saver(tf.global_variables())
-            p_saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.VARIABLES, ["g_neg2pos", "g_pos2neg"]))
+            p_saver = tf.train.Saver(tf.global_variables())
             graph = tf.summary.FileWriter('./logs', sess.graph)
             merged_summary = tf.summary.merge_all()
             
