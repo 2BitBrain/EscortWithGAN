@@ -98,7 +98,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
                 if t != 0:
                     tf.get_variable_scope().reuse_variables()
                     
-                d_embedded = tf.nn.embedding_lookup(d_embedding_weight, out)
+                d_embedded = tf.reshape(tf.nn.embedding_lookup(d_embedding_weight, out), (-1, args.embedding_size))
                 rnn_output_, state = decoder_cell(d_embedded, state)
                 out_ = tf.layers.dense(rnn_output_, args.vocab_size, name='rnn_out_dense')
                 if t < args.max_time_step -1:

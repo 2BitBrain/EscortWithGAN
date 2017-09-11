@@ -58,8 +58,12 @@ class model():
        #####start training #####
         self.pos2neg,_, p_e_cell, p_d_cell = generator(self.pos_inps, None, self.go, p_e_cell, p_d_cell,args, "g_pos2neg", True, True, False)
         self.neg2pos,_, n_e_cell, n_d_cell = generator(self.neg_inps, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
-        neg2pos_,_,_,_ = generator(self.pos2neg, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
-        pos2neg_,_,_,_ = generator(self.neg2pos, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
+        
+        cyc_inp = tf.expand_dims(tf.arg_max(self.pos2neg, 2), -1) if args.embedding else self.pos2neg
+        neg2pos_,_,_,_ = generator(cyc_inp, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
+        
+        cyc_inp = tf.expand_dims(tf.arg_max(self.neg2pos, 2), -1) if args.embedding else self.neg2pos
+        pos2neg_,_,_,_ = generator(cyc_inp, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
 
         dis_p_real, p_cell = discriminator(self.pos_inps, None, args, "discriminator_pos", False)
         dis_n_real, n_cell = discriminator(self.neg_inps, None, args, "discriminator_neg", False)
