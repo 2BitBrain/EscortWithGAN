@@ -72,10 +72,7 @@ class model():
         loss_d_n = tf.reduce_mean(tf.square(1-dis_n_real)) + tf.reduce_mean(tf.square(dis_n_fake))
         self.d_loss = (loss_d_n + loss_d_p)/2
 
-        if not args.embedding:
-            cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_))))
-        else:
-            cycle_loss = 0.
+        cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_))))
 
         loss_g_p = tf.reduce_mean(tf.square(1 - dis_p_fake))
         loss_g_n = tf.reduce_mean(tf.square(1 - dis_n_fake))
@@ -124,11 +121,27 @@ class model():
             merged_summary = tf.summary.merge_all()
             
             if self.args.pre_train and not self.args.pre_train_done:
+                in_neg, d_in_neg, d_label_neg, in_pos, d_in_pos, d_label_pos = mk_pre_train_func()
+                neg_ = range(in_neg[0])
+                pos_ = range(in_pos[0])
                 print("## start to pre train ##")
                 for i in range(self.args.p_itrs):
-                    input_, label_ = hoge()
-                    p_loss, _ = sess.run([self.p_p_loss, opt_p_p])
-                    n_loss, _ = sess.run([self.p_n_loss, opt_p_n])
+                    choiced_pos_idx = [random.choice(pos_) for _ in range(self.args.batch_size)] 
+                    choiced_neg_idx = [random.choice(neg_) for _ in range(self.args.batch_size)]
+                    pos_feed = {
+                        self.pos_inps: in_pos[choiced_pos_idx],
+                        self.pos_pretrain_d_input: d_in_pos[choiced_pos_idx],
+                        self.pos_pretrain_label: d_label_pos[choiced_pos_idx]
+                    }                   
+
+                    neg_feed = {
+                        self.neg_inps: in_neg[choiced_neg_idx],
+                        self.neg_pretrain_d_input: d_in_neg[choiced_neg_idx],
+                        self.neg_pretrain_d_input: d_label_neg[choiced_neg_idx]
+                    }
+
+                    p_loss, _ = sess.run([self.p_p_loss, opt_p_p], pos_feed)
+                    n_loss, _ = sess.run([self.p_n_loss, opt_p_n], neg_feed)
 
                     if i % 30 == 0:print("p_loss:", p_loss,"   n_loss:", n_loss)
                     if i % 60 == 0:p_saver.save(sess, self.args.pre_train_path)
