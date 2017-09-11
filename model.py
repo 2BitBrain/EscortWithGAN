@@ -40,17 +40,15 @@ class model():
         self.neg_inps = tf.placeholder(dtype=dtype, shape=shape)
         self.go = tf.placeholder(dtype=dtype, shape=[None,  1] if args.embedding  else [None, args.vocab_size])
 
-        self.pos_pretrain_e_input = tf.placeholder(dtype=dtype, shape=shape)
         self.pos_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
-        self.pos_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
+        self.pos_pretrain_label = tf.placeholder(dtype=tf.float32, shape=shape)
         
-        self.neg_pretrain_e_input = tf.placeholder(dtype=dtype, shape=shape)
         self.neg_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
-        self.neg_pretrain_label = tf.placeholder(dtype=dtype, shape=shape)
+        self.neg_pretrain_label = tf.placeholder(dtype=tf.float32, shape=shape)
         
        #####start pre training#####
-        pos2pos, regu_p_loss, p_e_cell, p_d_cell = generator(self.pos_pretrain_e_input, self.pos_pretrain_d_input, None, None, None, args, "g_pos2neg", False, False, True) 
-        neg2neg, regu_n_loss, n_e_cell, n_d_cell = generator(self.neg_pretrain_e_input, self.neg_pretrain_d_input, None, None, None, args, "g_neg2pos", False, True, True)
+        pos2pos, regu_p_loss, p_e_cell, p_d_cell = generator(self.pos_inps, self.pos_pretrain_d_input, None, None, None, args, "g_pos2neg", False, False, True) 
+        neg2neg, regu_n_loss, n_e_cell, n_d_cell = generator(self.neg_inps, self.neg_pretrain_d_input, None, None, None, args, "g_neg2pos", False, True, True)
 
         self.p_p_loss = tf.squared_difference(pos2pos, self.pos_pretrain_label) + regu_p_loss
         self.p_n_loss = tf.squared_difference(neg2neg, self.neg_pretrain_label) + regu_n_loss
@@ -137,7 +135,7 @@ class model():
                     neg_feed = {
                         self.neg_inps: in_neg[choiced_neg_idx],
                         self.neg_pretrain_d_input: d_in_neg[choiced_neg_idx],
-                        self.neg_pretrain_d_input: d_label_neg[choiced_neg_idx]
+                        self.neg_pretrain_label: d_label_neg[choiced_neg_idx]
                     }
 
                     p_loss, _ = sess.run([self.p_p_loss, opt_p_p], pos_feed)
@@ -198,7 +196,6 @@ if __name__ == "__main__":
     parser.add_argument("--embedding", dest="embedding", type=bool, default=True)
     parser.add_argument("--scale", dest="scale", type=float, default=1.)  
     parser.add_argument("--use_extracted_feature", dest="use_extracted_feature", type=bool, default=False)
-    parser.add_argument("--decoder_embedding", dest="decoder_embedding", type=bool, default=False)
     parser.add_argument("--reg_constant", dest="reg_constant", type=float, default=1.)
     parser.add_argument("--l_labmda", dest="l_lambda", type=float, default=1.)
     parser.add_argument("--pre_train", dest="pre_train", type=bool, default=True)

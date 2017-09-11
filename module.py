@@ -92,8 +92,8 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
         outputs = []
         out = go if not pre_train else p_d_x[:,0,:]
         decoder_cell = d_cell if not d_cell == None else def_cell(args, size) 
-        if args.decoder_embedding:
-            d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initial_state=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
+        if args.embedding:
+            d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
             for t in range(args.max_time_step):
                 if t != 0:
                     tf.get_variable_scope().reuse_variables()
