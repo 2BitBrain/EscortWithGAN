@@ -28,7 +28,7 @@ def extract_feature(x, args, reuse=False):
 
         with tf.variable_scope("Embedding", reuse=reuse):
             splitted_word_ids  = tf.split(x, args.max_time_step, axis=1)
-            embedding_weight = tf.get_variable(name='embedding_weight', shape=[args.vocab_size, args.embedding_size])
+            embedding_weight = tf.get_variable(name='embedding_weight', shape=[args.vocab_size+2, args.embedding_size])
             t_embedded = []
             
             for t in range(args.max_time_step):
@@ -63,7 +63,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
 
             rnn_inputs = []
             if args.embedding:
-                embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
+                embedding_weight = tf.get_variable(shape=[args.vocab_size+2, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name= "embedding_weight")
 
                 for t in range(args.max_time_step):
                     embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
@@ -93,7 +93,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
         out = go if not pre_train else p_d_x[:,0,:]
         decoder_cell = d_cell if not d_cell == None else def_cell(args, size) 
         if args.embedding:
-            d_embedding_weight = tf.get_variable(shape=[args.vocab_size, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
+            d_embedding_weight = tf.get_variable(shape=[args.vocab_size+2, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
             for t in range(args.max_time_step):
                 if t != 0:
                     tf.get_variable_scope().reuse_variables()
@@ -126,9 +126,16 @@ def discriminator(x, cell, args, name, reuse=False):
     with tf.variable_scope(name):
         if reuse: 
             tf.get_variable_scope().reuse_variables()
+        
+        with tf.variable_scope("embedding"):
+            if reuse:
+                tf.get_variable_scope().reuse_variables()
+
+            embedding_weight = tf.get_variable("d_embedding_weight", [args.vocab_size+2, args.embedding_size], dtype=tf.float32, initial_state=tf.contrib.layers.xavier_initializer())
+            for i in range()
 
         cell_ = cell if not cell == None else def_cell(args, args.dis_rnn_size)
-        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), scope=name+"d_rnn",dtype=tf.float32) 
+        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), scope=name+"d_rnn", dtype=tf.float32) 
 
 
         if args.merged_all:
