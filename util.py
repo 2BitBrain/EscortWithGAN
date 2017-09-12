@@ -32,7 +32,6 @@ def read_index(data_path):
         lines = fs.readlines()
     
     return [line.split("\n")[0] for line in lines]
-     
     
 def remove_anti_pattern(sentence, patterns=[["\.+", " ."], ["\!+", " !"], ["\?+", " ?"], [",", " ,"], ["[\n\x99\x92\x80@�£ã’‘©µ…ªâ*&\]\“^[\-><_;:+#”$%'\"()=~|¥{}/\\\\]", ""],["\s{2,}", ""],["\.", " ."]]):
         for pattern in patterns:
@@ -56,6 +55,13 @@ def read_training_data(data_path):
 
     return neg, pos 
 
+def read_sentence_data(data_path):
+    with open(data_path, "r") as fs:
+        lines = fs.readlines()
+
+    sentences = [remove_anti_pattern(line.split("	")[1].lower()) for line in lines]
+    return sentences
+    
 def mk_go(batch_size, vocab_size):
     r = []
     for _ in range(batch_size):
@@ -64,14 +70,16 @@ def mk_go(batch_size, vocab_size):
         r.append(c)
     return np.array(r)
 
-def convert_sentence2index(sentences, index, time_step):
+def convert_sentence2index(sentences, index, time_step, go = False):
     r = []
     for sentence in sentences:
         #print(sentence)
         words = sentence.split(" ")
         converted = [index.index(word) for word in words]
+        if go:
+            converted.insert(0, len(index))
         while len(converted) != time_step and len(converted) <= time_step:
-            converted.append(len(index))
+            converted.append(len(index)+1)
         r.append(converted[:time_step])
     return np.reshape(np.array(r), (-1, time_step, 1))
 
@@ -84,21 +92,28 @@ def convert_label(labels):
         r.append(content)
     return np.array(r)
 
-def convert_senteo2one_hot_encoding(sentences, indexs, time_step):
+def convert_sentence2one_hot_encoding(sentences, indexs, time_step, go=False):
     r = []
     for sentence in sentences:
         words = sentence.split(" ")
         time_steps = []
+        ## append <GO>
+        if go:
+            content = [0]*(len(indexs)+2)
+            content[len(indexs)] = 1
+            time_steps.append(content)
+        
         for word in words:
             content = [0]*(len(indexs)+2)
             idx = indexs.index(word)
             content[idx] = 1
             time_steps.append(content)
 
+        ##append <EOS>
         while len(time_steps) <= time_step and len(time_steps) != time_step:
             content = [0]*(len(indexs)+2)
-            content[len(indexs)] = 1
-            time_steps.insert(0, content)
+            content[len(indexs)+1] = 1
+            time_steps.append(content)
 
         r.append(time_steps[:time_step])
     return np.array(r)
@@ -117,28 +132,8 @@ def visualizer(x, y, index_path, save_path):
     with open(save_path, "a") as fs:
         fs.write("\n".join(["{}  <-> {}".format(x,y) for x,y in zip(sentences_x, sentences_y)]))
 
-"""
-def mk_train_data(data_path, index_path, time_step):
-    neg_sentences, pos_sentences = read_training_data(data_path)
-    print(len(neg_sentences), len(pos_sentences))
-    if  not os.path.exists(index_path):
-        word = []
-        for r_text in sentences:
-            #print(r_text)
-            [word.append(word_) for word_ in r_text.split(' ')]
-        save_index(set(word), index_path)
-    
-    indexs = read_index(index_path)
-    neg_converted_sentences = convert_sentence2index(neg_sentences, indexs, time_step)
-    print("Done converting negative sentences")
-    neg_one_hot_sentences = convert_senteo2one_hot_encoding(neg_sentences, indexs, time_step)
-    print("Done converting negative sentences to one hot vector")
-    pos_converted_sentences = convert_sentence2index(pos_sentences, indexs, time_step)
-    print("Done converting postive sentences")
-    pos_one_hot_sentences = convert_senteo2one_hot_encoding(pos_sentences, indexs, time_step)
-    print("Done converting positive sentences to one hot vector")
-    return neg_converted_sentences, neg_one_hot_sentences, pos_converted_sentences, pos_one_hot_sentences
-"""
+def mk_index(data_path, index_path):
+    pass
 
 def mk_train_data(data_path, index_path, time_step,embedding=False):
     neg_sentences, pos_sentences = read_training_data(data_path)
@@ -156,7 +151,7 @@ def mk_train_data(data_path, index_path, time_step,embedding=False):
     else:
         convert_func = convert_sentence2one_hot_encoding
         
-    def mk_pre_train_func(embedding=False):
+    def mk_pre_train_func():
             in_neg = convert_func(neg_sentences, indexs, time_step)
             d_in_neg = convert_func(neg_sentences, indexs, time_step, True)
             d_label_neg = convert_sentence2one_hot_encoding(neg_sentences, indexs, time_step)[:,:,:]
@@ -166,7 +161,7 @@ def mk_train_data(data_path, index_path, time_step,embedding=False):
             d_label_pos = convert_sentence2one_hot_encoding(pos_sentences, indexs, time_step)[:,:,:] 
             return in_neg, d_in_neg, d_label_neg, in_pos, d_pos, d_label_pos
 
-    def mk_train_func(embedding=False):
+    def mk_train_func():
         in_neg = convert_func(neg_sentences, indexs, time_step)
         in_pos = convert_func(pos_sentences, indexs, time_step)
         return in_neg, in_pos

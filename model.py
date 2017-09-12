@@ -33,7 +33,7 @@ class model():
             shape = [None, args.max_time_step, 1]
             dtype = tf.int32
         else:
-            shape = [None, args.max_time_step, args.vocab_size]
+            shape = [None, args.max_time_step, args.vocab_size+2]
             dtype=tf.float32
 
         self.pos_inps = tf.placeholder(dtype=dtype, shape=shape)
@@ -41,10 +41,10 @@ class model():
         self.go = tf.placeholder(dtype=dtype, shape=[None,  1] if args.embedding  else [None, args.vocab_size])
 
         self.pos_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
-        self.pos_pretrain_label = tf.placeholder(dtype=tf.float32, shape=shape)
+        self.pos_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
         
         self.neg_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
-        self.neg_pretrain_label = tf.placeholder(dtype=tf.float32, shape=shape)
+        self.neg_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
         
        #####start pre training#####
         pos2pos, regu_p_loss, p_e_cell, p_d_cell = generator(self.pos_inps, self.pos_pretrain_d_input, None, None, None, args, "g_pos2neg", False, False, True) 
@@ -107,13 +107,9 @@ class model():
         opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
 
-        neg_converted_sentences, neg_one_hot_sentences, pos_converted_sentences, pos_one_hot_sentences = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step)
-        neg_data_size = neg_converted_sentences.shape[0]
-        pos_data_size = pos_converted_sentences.shape[0]
+        mk_pre_train_func, mk_train_func = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step, self.args.embedding)
         
         go = mk_go(self.args.batch_size, self.args.vocab_size)
-
-        mk_pre_train_func, mk_train_func(self.args.data_dir+"train.txt", self.args.index_dir, self.args.max_time_step, self.args.embedding)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -129,8 +125,8 @@ class model():
             
             if self.args.pre_train and not self.args.pre_train_done:
                 in_neg, d_in_neg, d_label_neg, in_pos, d_in_pos, d_label_pos = mk_pre_train_func()
-                neg_ = range(in_neg[0])
-                pos_ = range(in_pos[0])
+                neg_ = range(in_neg.shape[0])
+                pos_ = range(in_pos.shape[0])
                 print("## start to pre train ##")
                 for i in range(self.args.p_itrs):
                     choiced_pos_idx = [random.choice(pos_) for _ in range(self.args.batch_size)] 
