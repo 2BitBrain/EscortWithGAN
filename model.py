@@ -121,6 +121,7 @@ class model():
             graph = tf.summary.FileWriter('./logs', sess.graph)
             merged_summary = tf.summary.merge_all()
             
+            ## Part of Pre-Training ##
             if self.args.pre_train and not self.args.pre_train_done:
                 in_neg, d_in_neg, d_label_neg, in_pos, d_in_pos, d_label_pos = mk_pre_train_func()
                 neg_ = range(in_neg.shape[0])
@@ -146,7 +147,7 @@ class model():
 
                     if i % 30 == 0:print("p_loss:", p_loss,"   n_loss:", n_loss)
                     if i % 60 == 0:p_saver.save(sess, self.args.pre_train_path)
-                pritn("## pre training done ! ##")
+                print("## pre training done ! ##")
 
             elif self.args.pre_train:
                 if not os.path.exits(self.args.pre_train_path):
