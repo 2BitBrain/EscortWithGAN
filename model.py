@@ -38,7 +38,7 @@ class model():
 
         self.pos_inps = tf.placeholder(dtype=dtype, shape=shape)
         self.neg_inps = tf.placeholder(dtype=dtype, shape=shape)
-        self.go = tf.placeholder(dtype=dtype, shape=[None,  1] if args.embedding  else [None, args.vocab_size])
+        self.go = tf.placeholder(dtype=dtype, shape=[None,  1] if args.embedding  else [None, args.vocab_size+2])
 
         self.pos_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
         self.pos_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
@@ -108,8 +108,6 @@ class model():
         opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
 
         mk_pre_train_func, mk_train_func = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step, self.args.embedding)
-        
-        go = mk_go(self.args.batch_size, self.args.vocab_size)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -157,26 +155,31 @@ class model():
                 
                 p_saver.restore(sess, self.args.pre_train_path)
                 print("## restore done ! ##")
-
+            
+            ## Training Network part of all ##
+            in_neg, in_pos = mk_train_func()
+            go = mk_go(self.args.batch_size, self.args.vocab_size, self.args.embedding)
+            pos_range = range(in_pos.shape[0])
+            neg_range = range(in_neg.shape[0])
             for itr in range(self.args.itrs):
-                pos_choiced_idx = random.sample(range(pos_data_size), self.args.batch_size)
-                neg_choiced_idx = random.sample(range(neg_data_size), self.args.batch_size)
+                pos_choiced_idx = random.sample(pos_range, self.args.batch_size)
+                neg_choiced_idx = random.sample(neg_range, self.args.batch_size)
 
-                feed_dict = {self.pos_inps:pos_one_hot_sentences[pos_choiced_idx],self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps:neg_one_hot_sentences[neg_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx], self.go:go}
-                
+                feed_dict = {self.pos_inps:in_pos[pos_choiced_idx],
+                             self.neg_inps:in_neg[neg_choiced_idx],
+                             self.go:go}
 
                 _, loss_g = sess.run([opt_g, self.g_loss], feed_dict=feed_dict)
                 _, loss_d = sess.run([opt_d, self.d_loss], feed_dict=feed_dict)
 
-                if itr % 100 == 0:
-                    feed_dict = {self.pos_inps_indexs:pos_converted_sentences[pos_choiced_idx], self.neg_inps_indexs:neg_converted_sentences[neg_choiced_idx], self.go:go} 
-                    neg_s, pos_s = sess.run([self.neg_outs, self.pos_outs], feed_dict)
-                    visualizer(neg_s, pos_one_hot_sentences[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
-                    visualizer(pos_s, neg_one_hot_sentences[neg_choiced_idx],"data/index.txt", "visualize_pos.txt")
+                if itr % 100 == 0: 
+                    neg_s, pos_s = sess.run([self.pos2neg, self.neg2pos], feed_dict)
+                    #visualizer(neg_s, pos_one_hot_sentences[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
+                    #visualizer(pos_s, neg_one_hot_sentences[neg_choiced_idx],"data/index.txt", "visualize_pos.txt")
                     print("itr", itr, "loss_g", loss_g, "loss_d", loss_d)
 
                 if itr % 10000 == 0:
-                    saver_.save(sess, "save/model.ckpt")
+                    saver_.save(sess, "saved/model.ckpt")
                     print("----------------------saved model-------------------")
 
 if __name__ == "__main__":
@@ -203,12 +206,12 @@ if __name__ == "__main__":
     parser.add_argument("--use_extracted_feature", dest="use_extracted_feature", type=bool, default=False)
     parser.add_argument("--reg_constant", dest="reg_constant", type=float, default=1.)
     parser.add_argument("--l_labmda", dest="l_lambda", type=float, default=1.)
-    parser.add_argument("--pre_train", dest="pre_train", type=bool, default=True)
+    parser.add_argument("--pre_train", dest="pre_train", type=bool, default=False)
     parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=False)
     args= parser.parse_args()
     
-    if not os.path.exists("save"):
-        os.mkdir("save")
+    if not os.path.exists("saved"):
+        os.mkdir("saved")
 
     if not os.path.exists("logs"):
         os.mkdir("logs")

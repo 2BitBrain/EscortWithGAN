@@ -62,13 +62,16 @@ def read_sentence_data(data_path):
     sentences = [remove_anti_pattern(line.split("	")[1].lower()) for line in lines]
     return sentences
     
-def mk_go(batch_size, vocab_size):
+def mk_go(batch_size, vocab_size, embedding):
     r = []
     for _ in range(batch_size):
-        c = [0]*vocab_size
-        c[vocab_size-1] = 1
-        r.append(c)
-    return np.array(r)
+        if embedding:
+            r.append(vocab_size)
+        else:
+            c = [0]*(vocab_size+2)
+            c[vocab_size] = 1
+            r.append(c)
+    return np.reshape(r, (-1, 1)) if embedding else np.array(r)
 
 def convert_sentence2index(sentences, index, time_step, go = False):
     r = []
