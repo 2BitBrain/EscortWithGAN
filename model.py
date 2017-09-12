@@ -58,8 +58,6 @@ class model():
        #####start training #####
         self.pos2neg,_, p_e_cell, p_d_cell = generator(self.pos_inps, None, self.go, p_e_cell, p_d_cell,args, "g_pos2neg", True, True, False)
         self.neg2pos,_, n_e_cell, n_d_cell = generator(self.neg_inps, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
-        
-        print(self.pos2neg.dtype)
 
         cyc_inp_p2n = tf.expand_dims(tf.arg_max(self.pos2neg, 2), -1) if args.embedding else self.pos2neg
         neg2pos_,_,_,_ = generator(cyc_inp_p2n, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
@@ -73,16 +71,16 @@ class model():
         dis_p_fake, _ = discriminator(cyc_inp_n2p, p_cell, args, "discriminator_pos", True)
         dis_n_fake, _ = discriminator(cyc_inp_p2n, n_cell, args, "discriminator_neg", True)
 
-        loss_d_p = tf.reduce_mean(tf.square(1-dis_p_real)) + tf.reduce_mean(tf.square(dis_p_fake))
-        loss_d_n = tf.reduce_mean(tf.square(1-dis_n_real)) + tf.reduce_mean(tf.square(dis_n_fake))
+        loss_d_p = tf.reduce_mean(tf.square(dis_p_real-1)) + tf.reduce_mean(tf.square(dis_p_fake))
+        loss_d_n = tf.reduce_mean(tf.square(dis_n_real-1)) + tf.reduce_mean(tf.square(dis_n_fake))
         self.d_loss = (loss_d_n + loss_d_p)/2
         
         pos_inps = tf.one_hot(tf.squeeze(self.pos_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.pos_inps
         neg_inps = tf.one_hot(tf.squeeze(self.neg_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.neg_inps
-        cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(neg_inps - pos2neg_))))
+        cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(pos_inps - neg2pos_))) + args.l_lambda * tf.reduce_mean(tf.square(tf.abs(neg_inps - pos2neg_))))
 
-        loss_g_p = tf.reduce_mean(tf.square(1 - dis_p_fake))
-        loss_g_n = tf.reduce_mean(tf.square(1 - dis_n_fake))
+        loss_g_p = tf.reduce_mean(tf.square(dis_p_fake-1))
+        loss_g_n = tf.reduce_mean(tf.square(dis_n_fake-1))
         self.g_loss = (loss_g_n + loss_g_p) / 2 + cycle_loss
 
         #####end training #####
