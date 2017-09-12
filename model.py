@@ -76,8 +76,10 @@ class model():
         loss_d_p = tf.reduce_mean(tf.square(1-dis_p_real)) + tf.reduce_mean(tf.square(dis_p_fake))
         loss_d_n = tf.reduce_mean(tf.square(1-dis_n_real)) + tf.reduce_mean(tf.square(dis_n_fake))
         self.d_loss = (loss_d_n + loss_d_p)/2
-
-        cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(self.pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(self.neg_inps - pos2neg_))))
+        
+        pos_inps = tf.one_hot(tf.squeeze(self.pos_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.pos_inps
+        neg_inps = tf.one_hot(tf.squeeze(self.neg_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.neg_inps
+        cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(pos_inps - neg2pos_))) + tf.reduce_mean(tf.square(tf.abs(neg_inps - pos2neg_))))
 
         loss_g_p = tf.reduce_mean(tf.square(1 - dis_p_fake))
         loss_g_n = tf.reduce_mean(tf.square(1 - dis_n_fake))
