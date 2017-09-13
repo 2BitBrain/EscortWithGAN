@@ -6,7 +6,7 @@ def def_cell(args, rnn_size, reuse=False):
         elif args.cell_model == 'gru':
             cell_fn = tf.contrib.rnn.GRUCell
         elif args.cell_model == 'lstm':
-            cell_fn = tf.contirib.rnn.BasicLSTM
+            cell_fn = tf.contrib.rnn.BasicLSTMCell
         else:
             raise Exception("model type not supported: {}".format(args.cell_model))
  
@@ -28,7 +28,7 @@ def extract_feature(x, args, reuse=False):
 
         with tf.variable_scope("Embedding", reuse=reuse):
             splitted_word_ids  = tf.split(x, args.max_time_step, axis=1)
-            embedding_weight = tf.get_variable(name='embedding_weight', shape=[args.vocab_size+2, args.embedding_size])
+            embedding_weight = tf.get_variable(name='embedding_weight', shape=[args.vocab_size+2, 64])
             t_embedded = []
             
             for t in range(args.max_time_step):
@@ -37,14 +37,14 @@ def extract_feature(x, args, reuse=False):
 
                 embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
                 t_embedded.append(embedded)
-            cnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(t_embedded), perm=(1,0,2,3)), (-1, args.max_time_step, args.embedding_size,1))
+            cnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(t_embedded), perm=(1,0,2,3)), (-1, args.max_time_step, 64,1))
            
         kernels = [2,3,4,5,6]
         filter_nums = [32,64,128,128,224]
         with tf.variable_scope("CNN", reuse=reuse):
             convded = []
             for kernel, filter_num in zip(kernels, filter_nums):
-                conv_ = tf.layers.conv2d(cnn_inputs, filter_num, kernel_size=[kernel, args.embedding_size], strides=[1, 1], activation=tf.nn.relu, padding='valid', name="conv_{}".format(kernel), reuse=reuse)
+                conv_ = tf.layers.conv2d(cnn_inputs, filter_num, kernel_size=[kernel, 64], strides=[1, 1], activation=tf.nn.relu, padding='valid', name="conv_{}".format(kernel), reuse=reuse)
                 pool_ = tf.layers.max_pooling2d(conv_, pool_size=[args.max_time_step-kernel+1, 1], padding='valid', strides=[1, 1])
                 convded.append(tf.reshape(pool_, (-1, filter_num)))
             convded = tf.concat([cnn_output for cnn_output in convded], axis=-1)

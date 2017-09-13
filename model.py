@@ -50,8 +50,8 @@ class model():
         A2A, regu_A_loss, A_e_cell, A_d_cell = generator(self.A_inps, self.A_pretrain_d_input, None, None, None, args, "g_A2B", False, False, True) 
         B2B, regu_B_loss, B_e_cell, B_d_cell = generator(self.B_inps, self.B_pretrain_d_input, None, None, None, args, "g_B2A", False, True, True)
 
-        self.p_A_loss = tf.reduce_mean(tf.squared_difference(A2A, self.A_pretrain_label)) + regu_A_loss
-        self.p_B_loss = tf.reduce_mean(tf.squared_difference(B2B, self.B_pretrain_label)) + regu_B_loss
+        self.p_A_loss = tf.reduce_mean(tf.squared_difference(A2A, self.A_pretrain_label))# + regu_A_loss
+        self.p_B_loss = tf.reduce_mean(tf.squared_difference(B2B, self.B_pretrain_label))# + regu_B_loss
 
        #####end pre training #### 
 
@@ -144,7 +144,7 @@ class model():
                     B_loss, _ = sess.run([self.p_B_loss, opt_p_B], B_feed)
 
                     if i % 30 == 0:print("A_loss:", A_loss,"   B_loss:", B_loss)
-                    if i % 60 == 0:p_saver.save(sess, self.args.pre_train_path)
+                    if i % 60 == 0:p_saver.save(sess, self.args.pre_train_path+"model.ckpt")
                 print("## pre training done ! ##")
 
             elif self.args.pre_train:
@@ -187,19 +187,19 @@ if __name__ == "__main__":
     parser.add_argument("--g_lr", dest="g_lr", type=float, default=0.08)
     parser.add_argument("--d_lr", dest="d_lr", type=float, default=0.01)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
-    parser.add_argument("--cell_model", dest="cell_model", type=str, default="gru")
+    parser.add_argument("--cell_model", dest="cell_model", type=str, default="lstm")
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
     parser.add_argument("--itrs", dest="itrs", type=int, default=1000001)
     parser.add_argument("--p_itrs", dest="p_itrs", type=int, default=10000)
     parser.add_argument("--batch_size", dest="batch_size", type=int, default=4)
-    parser.add_argument("--embedding_size", dest="embedding_size", default=64)
+    parser.add_argument("--embedding_size", dest="embedding_size", default=256)
     parser.add_argument("--rnn_embedding_size", dest="rnn_embedding_size", type=int, default=64)
     parser.add_argument("--max_time_step", dest="max_time_step", type=int, default=20)
     parser.add_argument("--vocab_size", dest="vocab_size", type=int, default=2346)
     parser.add_argument("--train", dest="train", type=bool, default=True)
     parser.add_argument("--keep_prob", dest="keep_prob", type=float, default=1)
-    parser.add_argument("--gen_rnn_size", dest="gen_rnn_size", type=int, default=1024)
+    parser.add_argument("--gen_rnn_size", dest="gen_rnn_size", type=int, default=512)
     parser.add_argument("--dis_rnn_size", dest="dis_rnn_size", type=int, default=576)
     parser.add_argument("--merged_all", dest="merged_all", type=bool, default=False)
     parser.add_argument("--embedding", dest="embedding", type=bool, default=True)
@@ -210,6 +210,7 @@ if __name__ == "__main__":
     parser.add_argument("--pre_train", dest="pre_train", type=bool, default=True)
     parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=False)
     parser.add_argument("--num_g_layers", dest="num_g_layers", type=int, default=2)
+    parser.add_argument("--pre_train_path", dest="pre_train_path", type=str, default="pre_train_saved/")
     args= parser.parse_args()
     
     if not os.path.exists("saved"):
@@ -217,6 +218,9 @@ if __name__ == "__main__":
 
     if not os.path.exists("logs"):
         os.mkdir("logs")
+
+    if not os.path.exists(args.pre_train_path):
+        os.mkdir(args.pre_train_path)
 
     model_ = model(args)
     if args.train:
