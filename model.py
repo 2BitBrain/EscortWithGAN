@@ -50,8 +50,8 @@ class model():
         A2A, regu_A_loss, A_e_cell, A_d_cell = generator(self.A_inps, self.A_pretrain_d_input, None, None, None, args, "g_A2B", False, False, True) 
         B2B, regu_B_loss, B_e_cell, B_d_cell = generator(self.B_inps, self.B_pretrain_d_input, None, None, None, args, "g_B2A", False, True, True)
 
-        self.p_A_loss = tf.squared_difference(A2A, self.A_pretrain_label) + regu_A_loss
-        self.p_B_loss = tf.squared_difference(B2B, self.B_pretrain_label) + regu_B_loss
+        self.p_A_loss = tf.squared_difference(A2A, self.A_pretrain_label)# + regu_A_loss
+        self.p_B_loss = tf.squared_difference(B2B, self.B_pretrain_label)# + regu_B_loss
 
        #####end pre training #### 
 
@@ -102,8 +102,8 @@ class model():
     def train(self):
         opt_p_A = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_A_loss, var_list=self.var_g_B)
         opt_p_B = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_B_loss, var_list=self.var_g_A)
-        opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
-        opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
+        opt_g = tf.train.GradientDescentOptimizer(self.args.g_lr).minimize(self.g_loss, var_list=self.var_g)
+        opt_d = tf.train.GradientDescentOptimizer(self.args.d_lr).minimize(self.d_loss, var_list=self.var_d)
 
         mk_pre_train_func, mk_train_func = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step, self.args.embedding)
 
@@ -184,6 +184,8 @@ class model():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--lr", dest="lr", type=float, default= 0.1)
+    parser.add_argument("--g_lr", dest="g_lr", type=float, default=0.08)
+    parser.add_argument("--d_lr", dest="d_lr", type=float, default=0.01)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
     parser.add_argument("--cell_model", dest="cell_model", type=str, default="gru")
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
