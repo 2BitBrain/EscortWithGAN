@@ -112,7 +112,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
                 input_ = tf.layers.dense(out, args.embedding_size, tf.nn.relu, name="docoder_embedding_dense")
                 print(input_.get_shape().as_list())
                 rnn_output_, state = decoder_cell(input_, state)
-                out_ = tf.layers.dense(rnn_output_, args.vocab_size+2, name="rnn_out_dense")
+                out_ = tf.layers.dense(rnn_output_, args.vocab_size+2, tf.nn.softmax, name="rnn_out_dense")
                 if t < args.max_time_step - 1:
                     out = out_ if not pre_train else p_d_x[:,t+1,:]
                 outputs.append(out_)

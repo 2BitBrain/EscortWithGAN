@@ -50,8 +50,8 @@ class model():
         A2A, regu_A_loss, A_e_cell, A_d_cell = generator(self.A_inps, self.A_pretrain_d_input, None, None, None, args, "g_A2B", False, False, True) 
         B2B, regu_B_loss, B_e_cell, B_d_cell = generator(self.B_inps, self.B_pretrain_d_input, None, None, None, args, "g_B2A", False, True, True)
 
-        self.p_A_loss = tf.squared_difference(A2A, self.A_pretrain_label)# + regu_A_loss
-        self.p_B_loss = tf.squared_difference(B2B, self.B_pretrain_label)# + regu_B_loss
+        self.p_A_loss = tf.reduce_mean(tf.squared_difference(A2A, self.A_pretrain_label)) + regu_A_loss
+        self.p_B_loss = tf.reduce_mean(tf.squared_difference(B2B, self.B_pretrain_label)) + regu_B_loss
 
        #####end pre training #### 
 
@@ -207,7 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--use_extracted_feature", dest="use_extracted_feature", type=bool, default=False)
     parser.add_argument("--reg_constant", dest="reg_constant", type=float, default=1.)
     parser.add_argument("--l_labmda", dest="l_lambda", type=float, default=1.)
-    parser.add_argument("--pre_train", dest="pre_train", type=bool, default=False)
+    parser.add_argument("--pre_train", dest="pre_train", type=bool, default=True)
     parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=False)
     parser.add_argument("--num_g_layers", dest="num_g_layers", type=int, default=2)
     args= parser.parse_args()
