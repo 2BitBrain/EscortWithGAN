@@ -100,8 +100,8 @@ class model():
         self.var_g = self.var_g_B + self.var_g_A
         
     def train(self):
-        opt_p_A = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_A_loss, var_list=self.var_g_B)
-        opt_p_B = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_B_loss, var_list=self.var_g_A)
+        opt_p_A = tf.train.AdamOptimizer(self.args.lr).minimize(self.p_A_loss, var_list=self.var_g_B)
+        opt_p_B = tf.train.AdamOptimizer(self.args.lr).minimize(self.p_B_loss, var_list=self.var_g_A)
         opt_g = tf.train.GradientDescentOptimizer(self.args.g_lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.d_lr).minimize(self.d_loss, var_list=self.var_d)
 
