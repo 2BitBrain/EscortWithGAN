@@ -36,72 +36,72 @@ class model():
             shape = [None, args.max_time_step, args.vocab_size+2]
             dtype=tf.float32
 
-        self.pos_inps = tf.placeholder(dtype=dtype, shape=shape)
-        self.neg_inps = tf.placeholder(dtype=dtype, shape=shape)
+        self.A_inps = tf.placeholder(dtype=dtype, shape=shape)
+        self.B_inps = tf.placeholder(dtype=dtype, shape=shape)
         self.go = tf.placeholder(dtype=dtype, shape=[None,  1] if args.embedding  else [None, args.vocab_size+2])
 
-        self.pos_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
-        self.pos_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
+        self.A_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.A_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
         
-        self.neg_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
-        self.neg_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
+        self.B_pretrain_d_input = tf.placeholder(dtype=dtype, shape=shape)
+        self.B_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
         
        #####start pre training#####
-        pos2pos, regu_p_loss, p_e_cell, p_d_cell = generator(self.pos_inps, self.pos_pretrain_d_input, None, None, None, args, "g_pos2neg", False, False, True) 
-        neg2neg, regu_n_loss, n_e_cell, n_d_cell = generator(self.neg_inps, self.neg_pretrain_d_input, None, None, None, args, "g_neg2pos", False, True, True)
+        A2A, regu_A_loss, A_e_cell, A_d_cell = generator(self.A_inps, self.A_pretrain_d_input, None, None, None, args, "g_A2B", False, False, True) 
+        B2B, regu_B_loss, B_e_cell, B_d_cell = generator(self.B_inps, self.B_pretrain_d_input, None, None, None, args, "g_B2A", False, True, True)
 
-        self.p_p_loss = tf.squared_difference(pos2pos, self.pos_pretrain_label) + regu_p_loss
-        self.p_n_loss = tf.squared_difference(neg2neg, self.neg_pretrain_label) + regu_n_loss
+        self.p_A_loss = tf.squared_difference(A2A, self.A_pretrain_label) + regu_A_loss
+        self.p_B_loss = tf.squared_difference(B2B, self.B_pretrain_label) + regu_B_loss
 
        #####end pre training #### 
 
        #####start training #####
-        self.pos2neg,_, p_e_cell, p_d_cell = generator(self.pos_inps, None, self.go, p_e_cell, p_d_cell,args, "g_pos2neg", True, True, False)
-        self.neg2pos,_, n_e_cell, n_d_cell = generator(self.neg_inps, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
+        self.A2B,_, A_e_cell, A_d_cell = generator(self.A_inps, None, self.go, A_e_cell, A_d_cell, args, "g_A2B", True, True, False)
+        self.B2A,_, B_e_cell, B_d_cell = generator(self.B_inps, None, self.go, B_e_cell, B_d_cell, args, "g_B2A", True, True, False)
 
-        cyc_inp_p2n = tf.expand_dims(tf.arg_max(self.pos2neg, 2), -1) if args.embedding else self.pos2neg
-        neg2pos_,_,_,_ = generator(cyc_inp_p2n, None, self.go, n_e_cell, n_d_cell, args, "g_neg2pos", True, True, False)
+        cyc_inp_A2B = tf.expand_dims(tf.arg_max(self.A2B, 2), -1) if args.embedding else self.A2B
+        B2A_,_,_,_ = generator(cyc_inp_A2B, None, self.go, B_e_cell, B_d_cell, args, "g_B2A", True, True, False)
 
-        cyc_inp_n2p = tf.expand_dims(tf.arg_max(self.neg2pos, 2), -1) if args.embedding else self.neg2pos
-        pos2neg_,_,_,_ = generator(cyc_inp_n2p, None, self.go, p_e_cell, p_d_cell, args, "g_pos2neg", True, True, False)
+        cyc_inp_B2A = tf.expand_dims(tf.arg_max(self.B2A, 2), -1) if args.embedding else self.B2A
+        A2B_,_,_,_ = generator(cyc_inp_B2A, None, self.go, A_e_cell, A_d_cell, args, "g_A2B", True, True, False)
 
-        dis_p_real, p_cell = discriminator(self.pos_inps, None, args, "discriminator_pos", False)
-        dis_n_real, n_cell = discriminator(self.neg_inps, None, args, "discriminator_neg", False)
+        dis_A_real, A_cell = discriminator(self.A_inps, None, args, "discriminator_A", False)
+        dis_B_real, B_cell = discriminator(self.B_inps, None, args, "discriminator_B", False)
         
-        dis_p_fake, _ = discriminator(cyc_inp_n2p, p_cell, args, "discriminator_pos", True)
-        dis_n_fake, _ = discriminator(cyc_inp_p2n, n_cell, args, "discriminator_neg", True)
+        dis_A_fake, _ = discriminator(cyc_inp_B2A, A_cell, args, "discriminator_A", True)
+        dis_B_fake, _ = discriminator(cyc_inp_A2B, B_cell, args, "discriminator_B", True)
 
-        loss_d_p = tf.reduce_mean(tf.square(dis_p_real-1)) + tf.reduce_mean(tf.square(dis_p_fake))
-        loss_d_n = tf.reduce_mean(tf.square(dis_n_real-1)) + tf.reduce_mean(tf.square(dis_n_fake))
-        self.d_loss = (loss_d_n + loss_d_p)/2
+        loss_d_A = tf.reduce_mean(tf.square(dis_A_real-1)) + tf.reduce_mean(tf.square(dis_A_fake))
+        loss_d_B = tf.reduce_mean(tf.square(dis_B_real-1)) + tf.reduce_mean(tf.square(dis_B_fake))
+        self.d_loss = (loss_d_A + loss_d_B)/2
         
-        pos_inps = tf.one_hot(tf.squeeze(self.pos_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.pos_inps
-        neg_inps = tf.one_hot(tf.squeeze(self.neg_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.neg_inps
-        cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(pos_inps - neg2pos_))) + args.l_lambda * tf.reduce_mean(tf.square(tf.abs(neg_inps - pos2neg_))))
+        A_inps = tf.one_hot(tf.squeeze(self.A_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.A_inps
+        B_inps = tf.one_hot(tf.squeeze(self.B_inps), args.vocab_size+2, 1., 0., -1) if args.embedding else self.B_inps
+        cycle_loss = args.l_lambda * (tf.reduce_mean(tf.square(tf.abs(A_inps - B2A_))) + args.l_lambda * tf.reduce_mean(tf.square(tf.abs(B_inps - A2B_))))
 
-        loss_g_p = tf.reduce_mean(tf.square(dis_p_fake-1))
-        loss_g_n = tf.reduce_mean(tf.square(dis_n_fake-1))
-        self.g_loss = (loss_g_n + loss_g_p) / 2 + cycle_loss
+        loss_g_A = tf.reduce_mean(tf.square(dis_A_fake-1))
+        loss_g_B = tf.reduce_mean(tf.square(dis_B_fake-1))
+        self.g_loss = (loss_g_B + loss_g_A) / 2 + cycle_loss
 
         #####end training #####
         
         with tf.variable_scope("summary") as scope:
-            tf.summary.scalar("discriminator_pos_loss", loss_d_p)
-            tf.summary.scalar("discriminator_neg_loss", loss_d_n)
-            tf.summary.scalar("generator_pos_loss", loss_g_p)
-            tf.summary.scalar("generator_neg_loss", loss_g_n)
+            tf.summary.scalar("discriminator_A_loss", loss_d_A)
+            tf.summary.scalar("discriminator_B_loss", loss_d_B)
+            tf.summary.scalar("generator_A_loss", loss_g_A)
+            tf.summary.scalar("generator_B_loss", loss_g_B)
 
         var_ = tf.trainable_variables()
-        self.var_d_p = [var for var in var_ if  "discriminator_pos" in var.name]
-        self.var_d_n = [var for var in var_ if  "discriminator_neg" in var.name]
-        self.var_g_p = [var for var in var_ if  "g_neg2pos" in var.name]
-        self.var_g_n = [var for var in var_ if  "g_pos2neg" in var.name]
-        self.var_d = self.var_d_n + self.var_d_p
-        self.var_g = self.var_g_n + self.var_g_p
+        self.var_d_A = [var for var in var_ if  "discriminator_A" in var.name]
+        self.var_d_B = [var for var in var_ if  "discriminator_B" in var.name]
+        self.var_g_A = [var for var in var_ if  "g_B2A" in var.name]
+        self.var_g_B = [var for var in var_ if  "g_A2B" in var.name]
+        self.var_d = self.var_d_B + self.var_d_A
+        self.var_g = self.var_g_B + self.var_g_A
         
     def train(self):
-        opt_p_p = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_p_loss, var_list=self.var_g_n)
-        opt_p_n = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_n_loss, var_list=self.var_g_p)
+        opt_p_A = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_A_loss, var_list=self.var_g_B)
+        opt_p_B = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.p_B_loss, var_list=self.var_g_A)
         opt_g = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.lr).minimize(self.d_loss, var_list=self.var_d)
 
@@ -128,22 +128,22 @@ class model():
                 for i in range(self.args.p_itrs):
                     choiced_pos_idx = [random.choice(pos_) for _ in range(self.args.batch_size)] 
                     choiced_neg_idx = [random.choice(neg_) for _ in range(self.args.batch_size)]
-                    pos_feed = {
-                        self.pos_inps: in_pos[choiced_pos_idx],
-                        self.pos_pretrain_d_input: d_in_pos[choiced_pos_idx],
-                        self.pos_pretrain_label: d_label_pos[choiced_pos_idx]
+                    A_feed = {
+                        self.A_inps: in_pos[choiced_pos_idx],
+                        self.A_pretrain_d_input: d_in_pos[choiced_pos_idx],
+                        self.A_pretrain_label: d_label_pos[choiced_pos_idx]
                     }                   
 
-                    neg_feed = {
-                        self.neg_inps: in_neg[choiced_neg_idx],
-                        self.neg_pretrain_d_input: d_in_neg[choiced_neg_idx],
-                        self.neg_pretrain_label: d_label_neg[choiced_neg_idx]
+                    B_feed = {
+                        self.B_inps: in_neg[choiced_neg_idx],
+                        self.B_pretrain_d_input: d_in_neg[choiced_neg_idx],
+                        self.B_pretrain_label: d_label_neg[choiced_neg_idx]
                     }
 
-                    p_loss, _ = sess.run([self.p_p_loss, opt_p_p], pos_feed)
-                    n_loss, _ = sess.run([self.p_n_loss, opt_p_n], neg_feed)
+                    A_loss, _ = sess.run([self.p_A_loss, opt_p_A], A_feed)
+                    B_loss, _ = sess.run([self.p_B_loss, opt_p_B], B_feed)
 
-                    if i % 30 == 0:print("p_loss:", p_loss,"   n_loss:", n_loss)
+                    if i % 30 == 0:print("A_loss:", A_loss,"   B_loss:", B_loss)
                     if i % 60 == 0:p_saver.save(sess, self.args.pre_train_path)
                 print("## pre training done ! ##")
 
@@ -164,15 +164,15 @@ class model():
                 pos_choiced_idx = random.sample(pos_range, self.args.batch_size)
                 neg_choiced_idx = random.sample(neg_range, self.args.batch_size)
 
-                feed_dict = {self.pos_inps:in_pos[pos_choiced_idx],
-                             self.neg_inps:in_neg[neg_choiced_idx],
+                feed_dict = {self.A_inps:in_pos[pos_choiced_idx],
+                             self.B_inps:in_neg[neg_choiced_idx],
                              self.go:go}
 
                 _, loss_g = sess.run([opt_g, self.g_loss], feed_dict=feed_dict)
                 _, loss_d = sess.run([opt_d, self.d_loss], feed_dict=feed_dict)
 
                 if itr % 100 == 0: 
-                    neg_s, pos_s = sess.run([self.pos2neg, self.neg2pos], feed_dict)
+                    B_s, A_s = sess.run([self.A2B, self.B2A], feed_dict)
                     #visualizer(neg_s, pos_one_hot_sentences[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
                     #visualizer(pos_s, neg_one_hot_sentences[neg_choiced_idx],"data/index.txt", "visualize_pos.txt")
                     print("itr", itr, "loss_g", loss_g, "loss_d", loss_d)
@@ -207,6 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--l_labmda", dest="l_lambda", type=float, default=1.)
     parser.add_argument("--pre_train", dest="pre_train", type=bool, default=False)
     parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=False)
+    parser.add_argument("--num_g_layers", dest="num_g_layers", type=int, default=2)
     args= parser.parse_args()
     
     if not os.path.exists("saved"):

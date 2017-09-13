@@ -6,13 +6,13 @@ def def_cell(args, rnn_size, reuse=False):
         elif args.cell_model == 'gru':
             cell_fn = tf.contrib.rnn.GRUCell
         elif args.cell_model == 'lstm':
-            pass
+            cell_fn = tf.contirib.rnn.BasicLSTM
         else:
             raise Exception("model type not supported: {}".format(args.cell_model))
  
         cell_ = cell_fn(rnn_size, reuse=reuse)
-        #if args.keep_prob < 1.:
-        #    cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=args.keep_prob)
+        if args.keep_prob < 1.:
+            cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=args.keep_prob)
         return cell_
 
 def extract_feature(x, args, reuse=False):
@@ -77,7 +77,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
                     rnn_inputs.append(tf.layers.dense(x[:,t,:], args.embedding_size, tf.nn.relu, name="embedding_dense"))
                 rnn_inputs = tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2))
         
-        encoder_cell = e_cell if not e_cell == None else def_cell(args, args.gen_rnn_size)
+        encoder_cell = e_cell if not e_cell == None else tf.contrib.rnn.MultiRNNCell([def_cell(args, args.gen_rnn_size) for _ in range(args.num_g_layers)])
         _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
         
         if args.use_extracted_feature:
@@ -91,7 +91,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
 
         outputs = []
         out = go if not pre_train else p_d_x[:,0,:]
-        decoder_cell = d_cell if not d_cell == None else def_cell(args, size) 
+        decoder_cell = d_cell if not d_cell == None else tf.contrib.rnn.MultiRNNCell([def_cell(args, size) for _ in range(args.num_g_layers)])
         if args.embedding:
             d_embedding_weight = tf.get_variable(shape=[args.vocab_size+2, args.embedding_size], initializer=tf.contrib.layers.xavier_initializer(), dtype=tf.float32, name="d_embedding_weight")
             for t in range(args.max_time_step):
