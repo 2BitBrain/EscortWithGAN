@@ -172,8 +172,8 @@ def discriminator(x, fw_cell, bw_cell, cells, args, name, reuse=False):
                 if t != 0:
                     tf.get_variable_scope().reuse_variables()
 
-                logit = tf.layers.dense(residual_inputs[:,t,:], 1, tf.nn.softmax, name="d_out")
+                logit = tf.layers.dense(residual_inputs[:,t,:], 1, tf.nn.sigmoid, name="d_out")
                 outputs.append(logit)
 
-        logits = tf.transpose(tf.convert_to_tensor(outputs), (1,0,2))
+        logits = tf.reshape(tf.transpose(tf.convert_to_tensor(outputs), (1,0,2)), (-1,1))
         return logits, fw_cell, bw_cell, cells
