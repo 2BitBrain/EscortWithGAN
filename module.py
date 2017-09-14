@@ -162,7 +162,7 @@ def discriminator(x, fw_cell, bw_cell, cells, args, name, reuse=False):
                         tf.get_variable_scope().reuse_variables()
 
                     out, state_ = cell(residual_inputs[:,t,:], state_)
-                    out = residual_inputs[:,t,:]
+                    out += residual_inputs[:,t,:]
                     outs.append(out)
                 residual_inputs = tf.transpose(tf.convert_to_tensor(outs), (1,0,2))
 
