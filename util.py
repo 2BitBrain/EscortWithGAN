@@ -123,13 +123,16 @@ def convert_sentence2one_hot_encoding(sentences, indexs, time_step, go=False):
 
 def visualizer(x, y, index_path, save_path):
     indexs = read_index(index_path)
+    indexs.append("<GO>")
+    indexs.append("<END>")
     sentences_x = []
     sentences_y = []
+    print(x.shape, y.shape)
+    y = np.reshape(y, y.shape[:-1]) 
     for s_x, s_y in zip(x, y):
         idxs_x = np.argmax(s_x, axis=-1)
-        idxs_y = np.argmax(s_y, axis=-1)
-        sentences_x.append(" ".join([indexs[idx] for idx in idxs_x if len(indexs) > idx]))
-        sentences_y.append(" ".join([indexs[idx] for idx in idxs_y if len(indexs) > idx]))
+        sentences_x.append(" ".join([indexs[idx] for idx in idxs_x]))
+        sentences_y.append(" ".join([indexs[idx] for idx in s_y]))
 
 
     with open(save_path, "a") as fs:

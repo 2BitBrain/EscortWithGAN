@@ -122,7 +122,7 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
         reg_loss = args.reg_constant * sum(reg_losses)
         return outputs, reg_loss, encoder_cell, decoder_cell
         
-def discriminator(x, cell, args, name, reuse=False): 
+def discriminator(x, fw_cell, bw_cell, cells, args, name, reuse=False): 
     with tf.variable_scope(name):
         if reuse: 
             tf.get_variable_scope().reuse_variables()
@@ -139,19 +139,40 @@ def discriminator(x, cell, args, name, reuse=False):
                 embedded = tf.reshape(tf.convert_to_tensor(embedded), (args.max_time_step,-1,args.embedding_size))
                 x = tf.transpose(embedded, (1,0,2))
         
-        cell_ = cell if not cell == None else def_cell(args, args.dis_rnn_size)
-        rnn_outputs, final_state = tf.nn.dynamic_rnn(cell_, x, initial_state=cell_.zero_state(batch_size=args.batch_size, dtype=tf.float32), scope=name+"d_rnn", dtype=tf.float32) 
+        fw_cell = fw_cell if not fw_cell == None else def_cell(args, args.dis_rnn_size/2)
+        bw_cell = bw_cell if not bw_cell == None else def_cell(args, args.dis_rnn_size/2)
+        cells = cells if not cells == None else [def_cell(args, arg.dis_rnn_size) for _ in range(args.num_d_layers)]
+        
+        birnn_outs, _ = tf.nn.bidirectional_dynamic_rnn(fw_cell,
+                                                        bw_cell,
+                                                        x,
+                                                        None,
+                                                        initial_state_fw=fw_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32),
+                                                        initial_state_bw=bw_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32),
+                                                        tf.float32,
+                                                        swap_memory=True)
 
 
-        if args.merged_all:
-            outputs = []
+        residual_inputs = tf.concat(birnn_outs, axis=-1)
+        for cell in cells:
+            outs = []
+            state_ = cell.zero_state(batch_size=args.batch_size, dtype=tf.float32)
             for t in range(args.max_time_step):
-                if t != 0:
+                if t !=0:
                     tf.get_variable_scope().reuse_variables()
 
-                outputs.append(tf.layers.dense(rnn_outputs[:,t,:], 1, activation=tf.nn.sigmoid, name="rnn_out_dense"))
-            logits = tf.reduce_sum(tf.transpose(tf.convert_to_tensor(outputs),(1,0,2)), axis=1)
-        else:
-            logits = tf.layers.dense(rnn_outputs[-1], 1, activation=tf.nn.sigmoid, reuse=reuse)
+                out, state_ = cell(residual_inputs[:,t,:], state_)
+                out = residual_inputs[:,t,:]
+                outs.append(out)
+            residual_inputs = tf.transpose(tf.convert_to_tensor(outs), (1,0,2))
 
-        return logits, cell_
+        outputs = []
+        for t in range(args.max_time_step):
+            if t != 0:
+                tf.get_variable_scope().reuse_variables()
+
+            logit = tf.layers.dense(residual_inputs[:,t,:], 1, tf.nn.softmax, name="d_out")
+            outputs.append(logit)
+
+        logits = tf.transpose(tf.convert_to_tensor(outputs), (1,0,2))
+        return logits, fw_cell, bw_cell, cells

@@ -81,7 +81,7 @@ class model():
 
         loss_g_A = tf.reduce_mean(tf.square(dis_A_fake-1))
         loss_g_B = tf.reduce_mean(tf.square(dis_B_fake-1))
-        self.g_loss = (loss_g_B + loss_g_A) / 2 + cycle_loss
+        self.g_loss = (loss_g_B + loss_g_A) / 2 + cycle_loss / 2
 
         #####end training #####
         
@@ -102,7 +102,7 @@ class model():
     def train(self):
         opt_p_A = tf.train.AdamOptimizer(self.args.lr).minimize(self.p_A_loss, var_list=self.var_g_B)
         opt_p_B = tf.train.AdamOptimizer(self.args.lr).minimize(self.p_B_loss, var_list=self.var_g_A)
-        opt_g = tf.train.GradientDescentOptimizer(self.args.g_lr).minimize(self.g_loss, var_list=self.var_g)
+        opt_g = tf.train.AdamOptimizer(self.args.g_lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.d_lr).minimize(self.d_loss, var_list=self.var_d)
 
         mk_pre_train_func, mk_train_func = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step, self.args.embedding)
@@ -143,16 +143,16 @@ class model():
                     A_loss, _ = sess.run([self.p_A_loss, opt_p_A], A_feed)
                     B_loss, _ = sess.run([self.p_B_loss, opt_p_B], B_feed)
 
-                    if i % 30 == 0:print("A_loss:", A_loss,"   B_loss:", B_loss)
+                    if i % 30 == 0:print(i," A_loss:", A_loss,"   B_loss:", B_loss)
                     if i % 60 == 0:p_saver.save(sess, self.args.pre_train_path+"model.ckpt")
                 print("## pre training done ! ##")
 
             elif self.args.pre_train:
-                if not os.path.exits(self.args.pre_train_path):
+                if not tf.train.get_checkpoint_state(self.args.pre_train_path):
                     print("trained model file does not exits")
                     return 
                 
-                p_saver.restore(sess, self.args.pre_train_path)
+                p_saver.restore(sess, self.args.pre_train_path+"model.ckpt")
                 print("## restore done ! ##")
             
             ## Training Network part of all ##
@@ -173,7 +173,7 @@ class model():
 
                 if itr % 100 == 0: 
                     B_s, A_s = sess.run([self.A2B, self.B2A], feed_dict)
-                    #visualizer(neg_s, pos_one_hot_sentences[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
+                    visualizer(B_s, in_pos[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
                     #visualizer(pos_s, neg_one_hot_sentences[neg_choiced_idx],"data/index.txt", "visualize_pos.txt")
                     print("itr", itr, "loss_g", loss_g, "loss_d", loss_d)
 
@@ -184,14 +184,14 @@ class model():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
     parser.add_argument("--lr", dest="lr", type=float, default= 0.1)
-    parser.add_argument("--g_lr", dest="g_lr", type=float, default=0.08)
-    parser.add_argument("--d_lr", dest="d_lr", type=float, default=0.01)
+    parser.add_argument("--g_lr", dest="g_lr", type=float, default=0.008)
+    parser.add_argument("--d_lr", dest="d_lr", type=float, default=0.001)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
     parser.add_argument("--cell_model", dest="cell_model", type=str, default="lstm")
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=50)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
     parser.add_argument("--itrs", dest="itrs", type=int, default=1000001)
-    parser.add_argument("--p_itrs", dest="p_itrs", type=int, default=10000)
+    parser.add_argument("--p_itrs", dest="p_itrs", type=int, default=601)
     parser.add_argument("--batch_size", dest="batch_size", type=int, default=4)
     parser.add_argument("--embedding_size", dest="embedding_size", default=256)
     parser.add_argument("--rnn_embedding_size", dest="rnn_embedding_size", type=int, default=64)
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     parser.add_argument("--reg_constant", dest="reg_constant", type=float, default=1.)
     parser.add_argument("--l_labmda", dest="l_lambda", type=float, default=1.)
     parser.add_argument("--pre_train", dest="pre_train", type=bool, default=True)
-    parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=False)
+    parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=True)
     parser.add_argument("--num_g_layers", dest="num_g_layers", type=int, default=2)
     parser.add_argument("--pre_train_path", dest="pre_train_path", type=str, default="pre_train_saved/")
     args= parser.parse_args()
