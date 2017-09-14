@@ -127,7 +127,7 @@ def visualizer(x, y, index_path, save_path):
     indexs.append("<END>")
     sentences_x = []
     sentences_y = []
-    print(x.shape, y.shape)
+    #print(x.shape, y.shape)
     y = np.reshape(y, y.shape[:-1]) 
     for s_x, s_y in zip(x, y):
         idxs_x = np.argmax(s_x, axis=-1)
