@@ -141,7 +141,7 @@ def discriminator(x, fw_cell, bw_cell, cells, args, name, reuse=False):
         
         fw_cell = fw_cell if not fw_cell == None else def_cell(args, args.dis_rnn_size/2)
         bw_cell = bw_cell if not bw_cell == None else def_cell(args, args.dis_rnn_size/2)
-        cells = cells if not cells == None else [def_cell(args, arg.dis_rnn_size) for _ in range(args.num_d_layers)]
+        cells = cells if not cells == None else [def_cell(args, args.dis_rnn_size) for _ in range(args.num_d_layers)]
         
         birnn_outs, _ = tf.nn.bidirectional_dynamic_rnn(fw_cell,
                                                         bw_cell,
@@ -149,30 +149,31 @@ def discriminator(x, fw_cell, bw_cell, cells, args, name, reuse=False):
                                                         None,
                                                         initial_state_fw=fw_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32),
                                                         initial_state_bw=bw_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32),
-                                                        tf.float32,
+                                                        dtype=tf.float32,
                                                         swap_memory=True)
 
+        with tf.variable_scope("rnn_residual"):
+            residual_inputs = tf.concat(birnn_outs, axis=-1)
+            for cell in cells:
+                outs = []
+                state_ = cell.zero_state(batch_size=args.batch_size, dtype=tf.float32)
+                for t in range(args.max_time_step):
+                    if t !=0:
+                        tf.get_variable_scope().reuse_variables()
 
-        residual_inputs = tf.concat(birnn_outs, axis=-1)
-        for cell in cells:
-            outs = []
-            state_ = cell.zero_state(batch_size=args.batch_size, dtype=tf.float32)
+                    out, state_ = cell(residual_inputs[:,t,:], state_)
+                    out = residual_inputs[:,t,:]
+                    outs.append(out)
+                residual_inputs = tf.transpose(tf.convert_to_tensor(outs), (1,0,2))
+
+        with tf.variable_scope("output_layers"):
+            outputs = []
             for t in range(args.max_time_step):
-                if t !=0:
+                if t != 0:
                     tf.get_variable_scope().reuse_variables()
 
-                out, state_ = cell(residual_inputs[:,t,:], state_)
-                out = residual_inputs[:,t,:]
-                outs.append(out)
-            residual_inputs = tf.transpose(tf.convert_to_tensor(outs), (1,0,2))
-
-        outputs = []
-        for t in range(args.max_time_step):
-            if t != 0:
-                tf.get_variable_scope().reuse_variables()
-
-            logit = tf.layers.dense(residual_inputs[:,t,:], 1, tf.nn.softmax, name="d_out")
-            outputs.append(logit)
+                logit = tf.layers.dense(residual_inputs[:,t,:], 1, tf.nn.softmax, name="d_out")
+                outputs.append(logit)
 
         logits = tf.transpose(tf.convert_to_tensor(outputs), (1,0,2))
         return logits, fw_cell, bw_cell, cells

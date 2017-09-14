@@ -211,6 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("--pre_train_done", dest="pre_train_done", type=bool, default=True)
     parser.add_argument("--num_g_layers", dest="num_g_layers", type=int, default=2)
     parser.add_argument("--pre_train_path", dest="pre_train_path", type=str, default="pre_train_saved/")
+    parser.add_argument("--num_d_layers", dest="num_d_layers", type=int, default=2)
     args= parser.parse_args()
     
     if not os.path.exists("saved"):
