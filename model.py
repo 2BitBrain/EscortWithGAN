@@ -65,11 +65,11 @@ class model():
         cyc_inp_B2A = tf.expand_dims(tf.arg_max(self.B2A, 2), -1) if args.embedding else self.B2A
         A2B_,_,_,_ = generator(cyc_inp_B2A, None, self.go, A_e_cell, A_d_cell, args, "g_A2B", True, True, False)
 
-        dis_A_real, A_cell = discriminator(self.A_inps, None, args, "discriminator_A", False)
-        dis_B_real, B_cell = discriminator(self.B_inps, None, args, "discriminator_B", False)
+        dis_A_real, A_fw_cell, A_bw_cell, A_cells = discriminator(self.A_inps, None, None, None, args, "discriminator_A", False)
+        dis_B_real, B_fw_cell, B_bw_cell, B_cells = discriminator(self.B_inps, None, None, None, args, "discriminator_B", False)
         
-        dis_A_fake, _ = discriminator(cyc_inp_B2A, A_cell, args, "discriminator_A", True)
-        dis_B_fake, _ = discriminator(cyc_inp_A2B, B_cell, args, "discriminator_B", True)
+        dis_A_fake,_,_,_ = discriminator(cyc_inp_B2A, A_fw_cell, A_bw_cell, A_cells, args, "discriminator_A", True)
+        dis_B_fake,_,_,_ = discriminator(cyc_inp_A2B, B_fw_cell, B_bw_cell, B_cells, args, "discriminator_B", True)
 
         loss_d_A = tf.reduce_mean(tf.square(dis_A_real-1)) + tf.reduce_mean(tf.square(dis_A_fake))
         loss_d_B = tf.reduce_mean(tf.square(dis_B_real-1)) + tf.reduce_mean(tf.square(dis_B_fake))
