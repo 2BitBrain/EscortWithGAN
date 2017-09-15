@@ -50,7 +50,7 @@ def extract_feature(x, args, reuse=False):
             convded = tf.concat([cnn_output for cnn_output in convded], axis=-1)
     return  tf.contrib.layers.flatten(convded)
 
-def generator(x, p_d_x, go, birnn_cells, e_cell, d_cell, args, name, reuse=False, extract_reuse=False , pre_train=True):
+def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reuse=False , pre_train=True):
     extracted_feature = extract_feature(x, args, extract_reuse)*0.01
     with tf.variable_scope(name, reuse=reuse) as scope:
         if reuse:
@@ -76,17 +76,9 @@ def generator(x, p_d_x, go, birnn_cells, e_cell, d_cell, args, name, reuse=False
 
                     rnn_inputs.append(tf.layers.dense(x[:,t,:], args.embedding_size, tf.nn.relu, name="embedding_dense"))
                 rnn_inputs = tf.transpose(tf.convert_to_tensor(rnn_inputs), (1,0,2))
-        birnn_cells = birnn_cells if not birnn_cells == None else [def_cell(args, args.gen_rnn_size/2) for _ in range(2)]
-        birnn_outs, _ = tf.nn.bidirectional_dynamic_rnn(birnn_cells[0],
-                                                        birnn_cells[1],
-                                                        rnn_inputs,
-                                                        initial_state_fw=birnn_cells[0].zero_state(batch_size=args.batch_size, dtype=tf.float32),
-                                                        initial_state_bw=birnn_cells[1].zero_state(batch_size=args.batch_size, dtype=tf.float32),
-                                                        dtype=tf.float32) 
-        e_inp = tf.concat(birnn_outs, -1)
 
         encoder_cell = e_cell if not e_cell == None else tf.contrib.rnn.MultiRNNCell([def_cell(args, args.gen_rnn_size) for _ in range(args.num_g_layers)])
-        attention_state, final_state = tf.nn.dynamic_rnn(encoder_cell, e_inp, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
+        _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
 
         if args.use_extracted_feature:
             state = tf.concat([final_state, extracted_feature], axis=-1)
@@ -129,7 +121,7 @@ def generator(x, p_d_x, go, birnn_cells, e_cell, d_cell, args, name, reuse=False
         outputs = tf.transpose(outputs, (1,0,2))
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_loss = args.reg_constant * sum(reg_losses)
-        return outputs, reg_loss, birnn_cells, encoder_cell, decoder_cell
+        return outputs, reg_loss, encoder_cell, decoder_cell
         
 def discriminator(x, fw_cell, bw_cell, cells, args, name, reuse=False): 
     with tf.variable_scope(name):

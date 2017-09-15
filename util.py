@@ -136,7 +136,7 @@ def visualizer(x, y, index_path, save_path):
 
 
     with open(save_path, "a") as fs:
-        fs.write("\n".join(["{},{}".format(x,y) for x,y in zip(sentences_x, sentences_y)]))
+        fs.write("".join(["{} | {}\n".format(x,y) for x,y in zip(sentences_x, sentences_y)]))
 
 def mk_index(data_path, index_path):
     pass
