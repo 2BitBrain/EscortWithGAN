@@ -47,8 +47,8 @@ class model():
         self.B_pretrain_label = tf.placeholder(dtype=tf.float32, shape=[None, args.max_time_step, args.vocab_size+2])
         
        #####start pre training#####
-        A2A, regu_A_loss, A_e_cell, A_d_cell = generator(self.A_inps, self.A_pretrain_d_input, None, None, None, args, "g_A2B", False, False, True) 
-        B2B, regu_B_loss, B_e_cell, B_d_cell = generator(self.B_inps, self.B_pretrain_d_input, None, None, None, args, "g_B2A", False, True, True)
+        A2A, regu_A_loss, A_birnn_cells, A_e_cell, A_d_cell = generator(self.A_inps, self.A_pretrain_d_input, None, None, None, None, args, "g_A2B", False, False, True) 
+        B2B, regu_B_loss, B_birnn_cells, B_e_cell, B_d_cell = generator(self.B_inps, self.B_pretrain_d_input, None, None, None, None, args, "g_B2A", False, True, True)
 
         self.p_A_loss = tf.reduce_mean(tf.squared_difference(A2A, self.A_pretrain_label))# + regu_A_loss
         self.p_B_loss = tf.reduce_mean(tf.squared_difference(B2B, self.B_pretrain_label))# + regu_B_loss
@@ -56,14 +56,14 @@ class model():
        #####end pre training #### 
 
        #####start training #####
-        self.A2B,_, A_e_cell, A_d_cell = generator(self.A_inps, None, self.go, A_e_cell, A_d_cell, args, "g_A2B", True, True, False)
-        self.B2A,_, B_e_cell, B_d_cell = generator(self.B_inps, None, self.go, B_e_cell, B_d_cell, args, "g_B2A", True, True, False)
+        self.A2B,_, A_birnn_cells, A_e_cell, A_d_cell = generator(self.A_inps, None, self.go, A_birnn_cells, A_e_cell, A_d_cell, args, "g_A2B", True, True, False)
+        self.B2A,_, B_birnn_cells, B_e_cell, B_d_cell = generator(self.B_inps, None, self.go, B_birnn_cells, B_e_cell, B_d_cell, args, "g_B2A", True, True, False)
 
         cyc_inp_A2B = tf.expand_dims(tf.arg_max(self.A2B, 2), -1) if args.embedding else self.A2B
-        B2A_,_,_,_ = generator(cyc_inp_A2B, None, self.go, B_e_cell, B_d_cell, args, "g_B2A", True, True, False)
+        B2A_,_,_,_,_ = generator(cyc_inp_A2B, None, self.go, B_birnn_cells, B_e_cell, B_d_cell, args, "g_B2A", True, True, False)
 
         cyc_inp_B2A = tf.expand_dims(tf.arg_max(self.B2A, 2), -1) if args.embedding else self.B2A
-        A2B_,_,_,_ = generator(cyc_inp_B2A, None, self.go, A_e_cell, A_d_cell, args, "g_A2B", True, True, False)
+        A2B_,_,_,_,_ = generator(cyc_inp_B2A, None, self.go, A_birnn_cells, A_e_cell, A_d_cell, args, "g_A2B", True, True, False)
 
         dis_A_real, A_fw_cell, A_bw_cell, A_cells = discriminator(self.A_inps, None, None, None, args, "discriminator_A", False)
         dis_B_real, B_fw_cell, B_bw_cell, B_cells = discriminator(self.B_inps, None, None, None, args, "discriminator_B", False)
@@ -173,8 +173,8 @@ class model():
 
                 if itr % 100 == 0: 
                     B_s, A_s = sess.run([self.A2B, self.B2A], feed_dict)
-                    visualizer(B_s, in_pos[pos_choiced_idx], "data/index.txt", "visualize_neg.txt")
-                    visualizer(A_s, in_neg[neg_choiced_idx],"data/index.txt", "visualize_pos.txt")
+                    visualizer(B_s, in_pos[pos_choiced_idx], "data/index.txt", "visualize_neg.csv")
+                    visualizer(A_s, in_neg[neg_choiced_idx],"data/index.txt", "visualize_pos.csv")
                     print("itr", itr, "loss_g", loss_g, "loss_d", loss_d)
 
                 if itr % 10000 == 0:

@@ -123,8 +123,8 @@ def convert_sentence2one_hot_encoding(sentences, indexs, time_step, go=False):
 
 def visualizer(x, y, index_path, save_path):
     indexs = read_index(index_path)
-    indexs.append("<GO>")
-    indexs.append("<END>")
+    indexs.append("")#<GO>
+    indexs.append("")#<END>
     sentences_x = []
     sentences_y = []
     #print(x.shape, y.shape)
@@ -136,7 +136,7 @@ def visualizer(x, y, index_path, save_path):
 
 
     with open(save_path, "a") as fs:
-        fs.write("\n".join(["{}  <-> {}".format(x,y) for x,y in zip(sentences_x, sentences_y)]))
+        fs.write("\n".join(["{},{}".format(x,y) for x,y in zip(sentences_x, sentences_y)]))
 
 def mk_index(data_path, index_path):
     pass

@@ -8,7 +8,9 @@ def check_args(args):
     if not args.num_d_layers > 0:
         ErrorMess+= "Please chose number larger than 0\n"
     if args.dis_rnn_size%2 != 0:
-        ErrorMess+= "Please chose even numbe\n"
+        ErrorMess+= "args.dis_rnn_size Please chose even number\n"
+    if args.gen_rnn_size%2 != 0:
+        ErrorMess+="args.gen_rnn_size Please chose even number\n"
     if ErrorMess != "":
         print(ErrorMess)
         sys.exit()        
@@ -44,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_g_layers", dest="num_g_layers", type=int, default=2)
     parser.add_argument("--pre_train_path", dest="pre_train_path", type=str, default="pre_train_saved/")
     parser.add_argument("--num_d_layers", dest="num_d_layers", type=int, default=2)
+    parser.add_argument("--attention_units", dest="attention_units", type=int, default=512)
     args= parser.parse_args()
    
     check_args(args)
