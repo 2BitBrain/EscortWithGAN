@@ -2,6 +2,7 @@ import os
 import argparse
 from model import *
 import sys 
+from util import *
 
 def check_args(args):
     ErrorMess = ""
@@ -17,15 +18,15 @@ def check_args(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("--lr", dest="lr", type=float, default= 0.01)
-    parser.add_argument("--g_lr", dest="g_lr", type=float, default=0.0008)
-    parser.add_argument("--d_lr", dest="d_lr", type=float, default=0.0001)
+    parser.add_argument("--lr", dest="lr", type=float, default= 0.0001)
+    parser.add_argument("--g_lr", dest="g_lr", type=float, default=0.0001)
+    parser.add_argument("--d_lr", dest="d_lr", type=float, default=0.00001)
     parser.add_argument("--data_dir", dest="data_dir", default="../data/")
     parser.add_argument("--cell_model", dest="cell_model", type=str, default="lstm")
     parser.add_argument("--l1_lambda", dest="l1_lambda", type=float, default=30)
     parser.add_argument("--index_dir", dest="index_dir", default="../data/index.txt")
     parser.add_argument("--itrs", dest="itrs", type=int, default=1000001)
-    parser.add_argument("--p_itrs", dest="p_itrs", type=int, default=6001)
+    parser.add_argument("--p_itrs", dest="p_itrs", type=int, default=4001)
     parser.add_argument("--batch_size", dest="batch_size", type=int, default=1)
     parser.add_argument("--embedding_size", dest="embedding_size", default=256)
     parser.add_argument("--rnn_embedding_size", dest="rnn_embedding_size", type=int, default=64)
@@ -51,6 +52,9 @@ if __name__ == "__main__":
    
     check_args(args)
 
+    if not os.path.exists("summary"):
+        os.mkdir("summary")
+
     if not os.path.exists("saved"):
         os.mkdir("saved")
 
@@ -62,4 +66,5 @@ if __name__ == "__main__":
 
     model_ = model(args)
     if args.train:
+        add_summary("itr", "gen_loss", "dis_loss", "summary/glr_{}_dlr_{}".format(args.g_lr, args.d_lr))
         model_.train()

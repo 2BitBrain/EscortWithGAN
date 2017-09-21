@@ -38,6 +38,10 @@ def remove_anti_pattern(sentence, patterns=[["\.+", " ."], ["\!+", " !"], ["\?+"
             sentence = re.sub(pattern[0], pattern[1], sentence)
         return sentence    
 
+def add_summary(itr, gen_loss, dis_loss, filename):
+    with open(filename, 'a') as fs:
+        fs.write("{},{},{}\n".format(itr, gen_loss, dis_loss))
+
 def read_training_data(data_path):
     with open(data_path, "r") as fs:
         lines = fs.readlines()
