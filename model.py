@@ -152,10 +152,8 @@ class model():
                 print("## restore done ! ##")
             
             ## Training Network part of all ##
-            in_neg, in_pos = mk_train_func()
             go = mk_go(self.args.batch_size, self.args.vocab_size, self.args.embedding)
-
-            gen = training_func()
+            gen = mk_train_func()
             for itr in range(self.args.itrs):
                 A_in, B_in = gen.__next__()
                 feed_dict = {self.A_inps:A_in,
