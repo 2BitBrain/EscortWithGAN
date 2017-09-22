@@ -105,15 +105,13 @@ class model():
         opt_g = tf.train.AdamOptimizer(self.args.g_lr).minimize(self.g_loss, var_list=self.var_g)
         opt_d = tf.train.GradientDescentOptimizer(self.args.d_lr).minimize(self.d_loss, var_list=self.var_d)
 
-        mk_pre_train_func, mk_train_func = mk_train_data("./data/train.txt", "./data/index.txt", self.args.max_time_step, self.args.embedding)
+        mk_pre_train_func, mk_train_func = mk_training_func(self.args.A_corpus_path, self.args.B_corpus_path, self.args.Marged_index_path, self.args.batch_size, self.args.max_time_step, self.args.embedding)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.log_device_placement = True
         with tf.Session(config=config) as sess:
             tf.global_variables_initializer().run()
-            saver = tf.train.Saver(tf.get_collection(tf.GraphKeys.VARIABLES, scope='Word_Level_CNN'))
-            saver.restore(sess, "./word_level_cnn_save/word_level_cnn_model.ckpt")
             saver_ = tf.train.Saver(tf.global_variables())
             p_saver = tf.train.Saver(tf.global_variables())
             graph = tf.summary.FileWriter('./logs', sess.graph)
@@ -121,23 +119,21 @@ class model():
             
             ## Part of Pre-Training ##
             if self.args.pre_train and not self.args.pre_train_done:
-                in_neg, d_in_neg, d_label_neg, in_pos, d_in_pos, d_label_pos = mk_pre_train_func()
-                neg_ = range(in_neg.shape[0])
-                pos_ = range(in_pos.shape[0])
+                p_gen = mk_pre_train_func()
+                
                 print("## start to pre train ##")
                 for i in range(self.args.p_itrs):
-                    choiced_pos_idx = [random.choice(pos_) for _ in range(self.args.batch_size)] 
-                    choiced_neg_idx = [random.choice(neg_) for _ in range(self.args.batch_size)]
+                    A_in, A_d_in, A_d_label, B_in, B_d, B_d_label = p_gen.__next__()
                     A_feed = {
-                        self.A_inps: in_pos[choiced_pos_idx],
-                        self.A_pretrain_d_input: d_in_pos[choiced_pos_idx],
-                        self.A_pretrain_label: d_label_pos[choiced_pos_idx]
+                        self.A_inps: A_in,
+                        self.A_pretrain_d_input: A_d_in,
+                        self.A_pretrain_label: A_d_label
                     }                   
 
                     B_feed = {
-                        self.B_inps: in_neg[choiced_neg_idx],
-                        self.B_pretrain_d_input: d_in_neg[choiced_neg_idx],
-                        self.B_pretrain_label: d_label_neg[choiced_neg_idx]
+                        self.B_inps: B_in,
+                        self.B_pretrain_d_input: B_d,
+                        self.B_pretrain_label: B_d_label
                     }
 
                     A_loss, _ = sess.run([self.p_A_loss, opt_p_A], A_feed)
@@ -158,14 +154,12 @@ class model():
             ## Training Network part of all ##
             in_neg, in_pos = mk_train_func()
             go = mk_go(self.args.batch_size, self.args.vocab_size, self.args.embedding)
-            pos_range = range(in_pos.shape[0])
-            neg_range = range(in_neg.shape[0])
-            for itr in range(self.args.itrs):
-                pos_choiced_idx = random.sample(pos_range, self.args.batch_size)
-                neg_choiced_idx = random.sample(neg_range, self.args.batch_size)
 
-                feed_dict = {self.A_inps:in_pos[pos_choiced_idx],
-                             self.B_inps:in_neg[neg_choiced_idx],
+            gen = training_func()
+            for itr in range(self.args.itrs):
+                A_in, B_in = gen.__next__()
+                feed_dict = {self.A_inps:A_in,
+                             self.B_inps:B_in,
                              self.go:go}
 
                 _, loss_g = sess.run([opt_g, self.g_loss], feed_dict=feed_dict)
