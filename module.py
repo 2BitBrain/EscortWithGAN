@@ -13,45 +13,9 @@ def def_cell(args, rnn_size, reuse=False):
         cell_ = cell_fn(rnn_size, reuse=reuse)
         if args.keep_prob < 1.:
             cell_ = tf.contrib.rnn.DropoutWrapper(cell_, output_keep_prob=args.keep_prob)
-        return cell_
-
-def extract_feature(x, args, reuse=False):
-    if not args.embedding:
-        x = tf.expand_dims(tf.argmax(x, axis=-1), axis=-1)
-    
-    with tf.variable_scope("Word_Level_CNN", reuse=reuse) as scope:
-        if reuse:
-            scope.reuse_variables()
-            #print(scope.name)
-        else:
-            assert tf.get_variable_scope().reuse == False
-
-        with tf.variable_scope("Embedding", reuse=reuse):
-            splitted_word_ids  = tf.split(x, args.max_time_step, axis=1)
-            embedding_weight = tf.get_variable(name='embedding_weight', shape=[args.vocab_size+2, 64])
-            t_embedded = []
-            
-            for t in range(args.max_time_step):
-                if t is not 0:
-                    tf.get_variable_scope().reuse_variables()
-
-                embedded = tf.nn.embedding_lookup(embedding_weight, x[:,t,:])
-                t_embedded.append(embedded)
-            cnn_inputs = tf.reshape(tf.transpose(tf.convert_to_tensor(t_embedded), perm=(1,0,2,3)), (-1, args.max_time_step, 64,1))
+        return cell_ 
            
-        kernels = [2,3,4,5,6]
-        filter_nums = [32,64,128,128,224]
-        with tf.variable_scope("CNN", reuse=reuse):
-            convded = []
-            for kernel, filter_num in zip(kernels, filter_nums):
-                conv_ = tf.layers.conv2d(cnn_inputs, filter_num, kernel_size=[kernel, 64], strides=[1, 1], activation=tf.nn.relu, padding='valid', name="conv_{}".format(kernel), reuse=reuse)
-                pool_ = tf.layers.max_pooling2d(conv_, pool_size=[args.max_time_step-kernel+1, 1], padding='valid', strides=[1, 1])
-                convded.append(tf.reshape(pool_, (-1, filter_num)))
-            convded = tf.concat([cnn_output for cnn_output in convded], axis=-1)
-    return  tf.contrib.layers.flatten(convded)
-
 def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reuse=False , pre_train=True):
-    extracted_feature = extract_feature(x, args, extract_reuse)*0.01
     with tf.variable_scope(name, reuse=reuse) as scope:
         if reuse:
             tf.get_variable_scope().reuse_variables()
@@ -80,14 +44,8 @@ def generator(x, p_d_x, go, e_cell, d_cell, args, name, reuse=False, extract_reu
         encoder_cell = e_cell if not e_cell == None else tf.contrib.rnn.MultiRNNCell([def_cell(args, args.gen_rnn_size) for _ in range(args.num_g_layers)])
         _, final_state = tf.nn.dynamic_rnn(encoder_cell, rnn_inputs, initial_state=encoder_cell.zero_state(batch_size=args.batch_size, dtype=tf.float32), dtype=tf.float32)
 
-        if args.use_extracted_feature:
-            state = tf.concat([final_state, extracted_feature], axis=-1)
-            noise = tf.random_normal(shape=tf.shape(state), mean=0., stddev=1., dtype=tf.float32)
-            state = tf.nn.tanh(state+noise)
-            size= args.gen_rnn_size + 576
-        else:
-            state = final_state
-            size = args.gen_rnn_size
+        state = final_state
+        size = args.gen_rnn_size
 
         outputs = []
         out = go if not pre_train else p_d_x[:,0,:]
