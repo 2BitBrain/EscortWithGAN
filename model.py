@@ -171,7 +171,8 @@ class model():
                 _, loss_g = sess.run([opt_g, self.g_loss], feed_dict=feed_dict)
                 _, loss_d = sess.run([opt_d, self.d_loss], feed_dict=feed_dict)
 
-                if itr % 100 == 0: 
+                if itr % 100 == 0:
+                    add_summary(itr, loss_g, loss_d, "summary/glr_{}_dlr_{}".format(self.args.g_lr, self.args.d_lr))
                     B_s, A_s = sess.run([self.A2B, self.B2A], feed_dict)
                     visualizer(B_s, in_pos[pos_choiced_idx], "data/index.txt", "visualize_neg.csv")
                     visualizer(A_s, in_neg[neg_choiced_idx],"data/index.txt", "visualize_pos.csv")
